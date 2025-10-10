@@ -11,8 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
-    """Register host management tools with the MCP server.
-    
+    """Register all host management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+    register_read_tools(mcp, client)
+    register_write_tools(mcp, client)
+
+
+def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register read-only host management tools with the MCP server.
+
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
@@ -213,7 +224,16 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "host": None,
                 "identifier": identifier
             }
-    
+
+
+def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register write host management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+
     @mcp.tool()
     async def fleet_delete_host(host_id: int) -> Dict[str, Any]:
         """Delete a host from Fleet.

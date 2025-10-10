@@ -19,3 +19,7 @@ timeout = 30
 # Maximum number of retries for failed requests (default: 3)
 # Helps with transient network issues
 max_retries = 3
+
+# Enable read-only mode (default: false)
+# When true, only read operations are available (no create/update/delete)
+readonly = false

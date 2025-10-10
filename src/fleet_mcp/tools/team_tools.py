@@ -11,8 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
-    """Register team and user management tools with the MCP server.
-    
+    """Register all team and user management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+    register_read_tools(mcp, client)
+    register_write_tools(mcp, client)
+
+
+def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register read-only team and user management tools with the MCP server.
+
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
@@ -53,52 +64,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "teams": [],
                 "count": 0
             }
-    
-    @mcp.tool()
-    async def fleet_create_team(
-        name: str,
-        description: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Create a new team in Fleet.
-        
-        Args:
-            name: Name for the team
-            description: Optional description of the team
-            
-        Returns:
-            Dict containing the created team information.
-        """
-        try:
-            async with client:
-                json_data = {"name": name}
-                
-                if description:
-                    json_data["description"] = description
-                
-                response = await client.post("/teams", json_data=json_data)
-                
-                if response.success and response.data:
-                    team = response.data.get("team", {})
-                    return {
-                        "success": True,
-                        "team": team,
-                        "message": f"Created team '{name}' with ID {team.get('id')}"
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": response.message,
-                        "team": None
-                    }
-        
-        except FleetAPIError as e:
-            logger.error(f"Failed to create team: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to create team: {str(e)}",
-                "team": None
-            }
-    
+
     @mcp.tool()
     async def fleet_get_team(team_id: int) -> Dict[str, Any]:
         """Get details of a specific team.
@@ -296,4 +262,58 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to list activities: {str(e)}",
                 "activities": [],
                 "count": 0
+            }
+
+
+def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register write team and user management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+
+    @mcp.tool()
+    async def fleet_create_team(
+        name: str,
+        description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a new team in Fleet.
+
+        Args:
+            name: Name for the team
+            description: Optional description of the team
+
+        Returns:
+            Dict containing the created team information.
+        """
+        try:
+            async with client:
+                json_data = {"name": name}
+
+                if description:
+                    json_data["description"] = description
+
+                response = await client.post("/teams", json_data=json_data)
+
+                if response.success and response.data:
+                    team = response.data.get("team", {})
+                    return {
+                        "success": True,
+                        "team": team,
+                        "message": f"Created team '{name}' with ID {team.get('id')}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "team": None
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to create team: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to create team: {str(e)}",
+                "team": None
             }

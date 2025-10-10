@@ -83,6 +83,7 @@ Fleet MCP can be configured via environment variables or a configuration file:
 - `FLEET_API_TOKEN` - API authentication token (required)
 - `FLEET_VERIFY_SSL` - Verify SSL certificates (default: true)
 - `FLEET_TIMEOUT` - Request timeout in seconds (default: 30)
+- `FLEET_READONLY` - Enable read-only mode (default: false)
 
 ### Configuration File
 Create a `fleet-mcp.toml` file:
@@ -93,7 +94,82 @@ server_url = "https://your-fleet-instance.com"
 api_token = "your-api-token"
 verify_ssl = true
 timeout = 30
+readonly = false
 ```
+
+## Read-Only Mode
+
+Fleet MCP supports a read-only mode that disables all write operations, providing a safe way to explore and monitor your Fleet instance without risk of making changes.
+
+### Enabling Read-Only Mode
+
+**Environment Variable:**
+```bash
+export FLEET_READONLY=true
+fleet-mcp run
+```
+
+**Configuration File:**
+```toml
+[fleet]
+readonly = true
+```
+
+**Command Line:**
+```bash
+fleet-mcp --readonly run
+```
+
+**Claude Desktop Configuration:**
+```json
+{
+  "mcpServers": {
+    "fleet-readonly": {
+      "command": "fleet-mcp",
+      "args": ["--readonly", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+### Available Operations in Read-Only Mode
+
+When read-only mode is enabled, only the following operations are available:
+
+**Host Management:**
+- List hosts with filtering and search
+- Get detailed host information
+- Search hosts by identifier
+
+**Query Management:**
+- List saved queries
+- Get query details
+- Get query execution results
+
+**Policy Management:**
+- List policies
+- Get policy compliance results
+
+**Software & Vulnerabilities:**
+- List software inventory
+- Get vulnerability information
+- Search for software packages
+
+**Team & User Management:**
+- List teams and users
+- Get team/user details
+- View activity logs
+
+**Disabled Operations:**
+- Creating, updating, or deleting queries
+- Creating, updating, or deleting policies
+- Creating teams
+- Deleting hosts or transferring between teams
+- Running live queries
 
 ## Development
 

@@ -11,8 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
-    """Register query management tools with the MCP server.
-    
+    """Register all query management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+    register_read_tools(mcp, client)
+    register_write_tools(mcp, client)
+
+
+def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register read-only query management tools with the MCP server.
+
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
@@ -79,119 +90,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "count": 0
             }
     
-    @mcp.tool()
-    async def fleet_create_query(
-        name: str,
-        query: str,
-        description: Optional[str] = None,
-        team_id: Optional[int] = None,
-        observer_can_run: bool = False
-    ) -> Dict[str, Any]:
-        """Create a new saved query in Fleet.
-        
-        Args:
-            name: Name for the query
-            query: SQL query string (osquery syntax)
-            description: Optional description of the query
-            team_id: Team ID to associate the query with
-            observer_can_run: Whether observers can run this query
-            
-        Returns:
-            Dict containing the created query information.
-        """
-        try:
-            async with client:
-                json_data = {
-                    "name": name,
-                    "query": query,
-                    "observer_can_run": observer_can_run
-                }
-                
-                if description:
-                    json_data["description"] = description
-                if team_id is not None:
-                    json_data["team_id"] = team_id
-                
-                response = await client.post("/queries", json_data=json_data)
-                
-                if response.success and response.data:
-                    query_data = response.data.get("query", {})
-                    return {
-                        "success": True,
-                        "query": query_data,
-                        "message": f"Created query '{name}' with ID {query_data.get('id')}"
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": response.message,
-                        "query": None
-                    }
-        
-        except FleetAPIError as e:
-            logger.error(f"Failed to create query: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to create query: {str(e)}",
-                "query": None
-            }
-    
-    @mcp.tool()
-    async def fleet_run_live_query(
-        query: str,
-        host_ids: Optional[List[int]] = None,
-        label_ids: Optional[List[int]] = None,
-        team_ids: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
-        """Run a live query against specified hosts.
-        
-        Args:
-            query: SQL query string to execute
-            host_ids: List of specific host IDs to target
-            label_ids: List of label IDs to target hosts
-            team_ids: List of team IDs to target hosts
-            
-        Returns:
-            Dict containing query execution results and campaign information.
-        """
-        try:
-            async with client:
-                json_data = {
-                    "query": query,
-                    "selected": {
-                        "hosts": host_ids or [],
-                        "labels": label_ids or [],
-                        "teams": team_ids or []
-                    }
-                }
-                
-                response = await client.post("/queries/run", json_data=json_data)
-                
-                if response.success and response.data:
-                    campaign = response.data.get("campaign", {})
-                    return {
-                        "success": True,
-                        "campaign": campaign,
-                        "campaign_id": campaign.get("id"),
-                        "query": query,
-                        "message": f"Started live query campaign {campaign.get('id')}"
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": response.message,
-                        "campaign": None,
-                        "query": query
-                    }
-        
-        except FleetAPIError as e:
-            logger.error(f"Failed to run live query: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to run live query: {str(e)}",
-                "campaign": None,
-                "query": query
-            }
+
     
     @mcp.tool()
     async def fleet_get_query_results(campaign_id: int) -> Dict[str, Any]:
@@ -273,7 +172,132 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "query": None,
                 "query_id": query_id
             }
-    
+
+
+def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register write query management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+
+    @mcp.tool()
+    async def fleet_create_query(
+        name: str,
+        query: str,
+        description: Optional[str] = None,
+        team_id: Optional[int] = None,
+        observer_can_run: bool = False
+    ) -> Dict[str, Any]:
+        """Create a new saved query in Fleet.
+
+        Args:
+            name: Name for the query
+            query: SQL query string (osquery syntax)
+            description: Optional description of the query
+            team_id: Team ID to associate the query with
+            observer_can_run: Whether observers can run this query
+
+        Returns:
+            Dict containing the created query information.
+        """
+        try:
+            async with client:
+                json_data = {
+                    "name": name,
+                    "query": query,
+                    "observer_can_run": observer_can_run
+                }
+
+                if description:
+                    json_data["description"] = description
+
+                if team_id is not None:
+                    json_data["team_id"] = team_id
+
+                response = await client.post("/queries", json_data=json_data)
+
+                if response.success and response.data:
+                    query_data = response.data.get("query", {})
+                    return {
+                        "success": True,
+                        "query": query_data,
+                        "message": f"Created query '{name}' with ID {query_data.get('id')}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "query": None
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to create query: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to create query: {str(e)}",
+                "query": None
+            }
+
+    @mcp.tool()
+    async def fleet_run_live_query(
+        query: str,
+        host_ids: Optional[List[int]] = None,
+        label_ids: Optional[List[int]] = None,
+        team_ids: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
+        """Execute a live query against specified hosts.
+
+        Args:
+            query: SQL query string to execute
+            host_ids: List of specific host IDs to target
+            label_ids: List of label IDs to target hosts
+            team_ids: List of team IDs to target hosts
+
+        Returns:
+            Dict containing campaign information and initial status.
+        """
+        try:
+            async with client:
+                json_data = {"query": query}
+
+                # Add targeting parameters if provided
+                if host_ids:
+                    json_data["selected"] = {"hosts": host_ids}
+                elif label_ids:
+                    json_data["selected"] = {"labels": label_ids}
+                elif team_ids:
+                    json_data["selected"] = {"teams": team_ids}
+
+                response = await client.post("/queries/run", json_data=json_data)
+
+                if response.success and response.data:
+                    campaign = response.data.get("campaign", {})
+                    return {
+                        "success": True,
+                        "campaign": campaign,
+                        "campaign_id": campaign.get("id"),
+                        "query": query,
+                        "message": f"Started live query campaign {campaign.get('id')}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "campaign": None,
+                        "query": query
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to run live query: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to run live query: {str(e)}",
+                "campaign": None,
+                "query": query
+            }
+
     @mcp.tool()
     async def fleet_delete_query(query_id: int) -> Dict[str, Any]:
         """Delete a saved query from Fleet.

@@ -11,8 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
-    """Register policy management tools with the MCP server.
-    
+    """Register all policy management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+    register_read_tools(mcp, client)
+    register_write_tools(mcp, client)
+
+
+def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register read-only policy management tools with the MCP server.
+
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
@@ -172,7 +183,18 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "policy": None,
                 "policy_id": policy_id
             }
-    
+
+
+def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register write policy management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+
+
+
     @mcp.tool()
     async def fleet_update_policy(
         policy_id: int,

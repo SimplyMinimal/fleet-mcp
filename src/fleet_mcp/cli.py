@@ -34,13 +34,20 @@ from .server import FleetMCPServer
     envvar="FLEET_API_TOKEN",
     help="Fleet API token"
 )
+@click.option(
+    "--readonly",
+    envvar="FLEET_READONLY",
+    is_flag=True,
+    help="Enable read-only mode (disables write operations)"
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
     config: Optional[Path],
     verbose: bool,
     server_url: Optional[str],
-    api_token: Optional[str]
+    api_token: Optional[str],
+    readonly: bool
 ) -> None:
     """Fleet MCP - Model Context Protocol tool for Fleet DM integration."""
     # Configure logging
@@ -55,6 +62,7 @@ def cli(
     ctx.obj["config_file"] = config
     ctx.obj["server_url"] = server_url
     ctx.obj["api_token"] = api_token
+    ctx.obj["readonly"] = readonly
     ctx.obj["verbose"] = verbose
 
 
@@ -63,6 +71,7 @@ def _load_config(ctx: click.Context) -> FleetConfig:
     config_file = ctx.obj["config_file"]
     server_url = ctx.obj["server_url"]
     api_token = ctx.obj["api_token"]
+    readonly = ctx.obj["readonly"]
 
     try:
         if config_file:
@@ -77,6 +86,8 @@ def _load_config(ctx: click.Context) -> FleetConfig:
             config_data["server_url"] = server_url
         if api_token:
             config_data["api_token"] = api_token
+        if readonly:
+            config_data["readonly"] = readonly
 
         return FleetConfig(**config_data)
 
@@ -93,7 +104,8 @@ def run(ctx: click.Context) -> None:
 
     try:
         server = FleetMCPServer(config)
-        click.echo(f"Starting Fleet MCP Server for {config.server_url}")
+        readonly_status = " (READ-ONLY MODE)" if config.readonly else ""
+        click.echo(f"Starting Fleet MCP Server for {config.server_url}{readonly_status}")
         server.run()
     except KeyboardInterrupt:
         click.echo("\nShutting down Fleet MCP Server...")

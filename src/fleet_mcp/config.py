@@ -41,6 +41,11 @@ class FleetConfig(BaseSettings):
         description="User agent string for API requests"
     )
 
+    readonly: bool = Field(
+        default=False,
+        description="Enable read-only mode (disables write operations)"
+    )
+
     @field_validator("server_url")
     @classmethod
     def validate_server_url(cls, v: str) -> str:

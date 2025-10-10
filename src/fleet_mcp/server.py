@@ -29,18 +29,21 @@ class FleetMCPServer:
         self.client = FleetClient(config)
         
         # Initialize FastMCP server
+        readonly_note = " (READ-ONLY MODE - no write operations available)" if self.config.readonly else ""
         self.mcp = FastMCP(
-            name="Fleet DM Server",
-            instructions="""
-            You are a Fleet DM management assistant. You can help with:
-            
-            - Managing hosts and devices in the fleet
-            - Creating and running osquery queries
-            - Managing compliance policies
+            name=f"Fleet DM Server{readonly_note}",
+            instructions=f"""
+            You are a Fleet DM management assistant{readonly_note}. You can help with:
+
+            - Managing hosts and devices in the fleet{"" if not self.config.readonly else " (read-only)"}
+            - {"Viewing" if self.config.readonly else "Creating and running"} osquery queries
+            - {"Viewing" if self.config.readonly else "Managing"} compliance policies
             - Tracking software inventory and vulnerabilities
-            - Managing teams and users
+            - {"Viewing" if self.config.readonly else "Managing"} teams and users
             - Monitoring fleet activities and security events
-            
+
+            {"Note: This server is in READ-ONLY mode. No create, update, or delete operations are available." if self.config.readonly else ""}
+
             Use the available tools to interact with the Fleet DM instance.
             Always provide clear, actionable information in your responses.
             """
@@ -50,23 +53,22 @@ class FleetMCPServer:
         self._register_tools()
     
     def _register_tools(self) -> None:
-        """Register all MCP tools with the server."""
-        # Register host management tools
-        host_tools.register_tools(self.mcp, self.client)
-        
-        # Register query management tools
-        query_tools.register_tools(self.mcp, self.client)
-        
-        # Register policy management tools
-        policy_tools.register_tools(self.mcp, self.client)
-        
-        # Register software and vulnerability tools
-        software_tools.register_tools(self.mcp, self.client)
-        
-        # Register team and user management tools
-        team_tools.register_tools(self.mcp, self.client)
-        
-        # Register server health check tool
+        """Register MCP tools with the server based on configuration."""
+        # Always register read-only tools
+        host_tools.register_read_tools(self.mcp, self.client)
+        query_tools.register_read_tools(self.mcp, self.client)
+        policy_tools.register_read_tools(self.mcp, self.client)
+        software_tools.register_tools(self.mcp, self.client)  # Software tools are all read-only
+        team_tools.register_read_tools(self.mcp, self.client)
+
+        # Only register write tools if not in readonly mode
+        if not self.config.readonly:
+            host_tools.register_write_tools(self.mcp, self.client)
+            query_tools.register_write_tools(self.mcp, self.client)
+            policy_tools.register_write_tools(self.mcp, self.client)
+            team_tools.register_write_tools(self.mcp, self.client)
+
+        # Register server health check tool (always available)
         self._register_health_check()
     
     def _register_health_check(self) -> None:
