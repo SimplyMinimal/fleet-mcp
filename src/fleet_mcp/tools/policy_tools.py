@@ -1,0 +1,274 @@
+"""Policy management tools for Fleet MCP."""
+
+import logging
+from typing import Any, Dict, List, Optional
+
+from mcp.server.fastmcp import FastMCP
+
+from ..client import FleetClient, FleetAPIError
+
+logger = logging.getLogger(__name__)
+
+
+def register_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register policy management tools with the MCP server.
+    
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+    
+    @mcp.tool()
+    async def fleet_list_policies(
+        team_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """List all policies in Fleet.
+        
+        Args:
+            team_id: Filter policies by team ID
+            
+        Returns:
+            Dict containing list of policies.
+        """
+        try:
+            async with client:
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+                
+                response = await client.get("/policies", params=params)
+                
+                if response.success and response.data:
+                    policies = response.data.get("policies", [])
+                    return {
+                        "success": True,
+                        "policies": policies,
+                        "count": len(policies),
+                        "message": f"Found {len(policies)} policies"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "policies": [],
+                        "count": 0
+                    }
+        
+        except FleetAPIError as e:
+            logger.error(f"Failed to list policies: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list policies: {str(e)}",
+                "policies": [],
+                "count": 0
+            }
+    
+    @mcp.tool()
+    async def fleet_create_policy(
+        name: str,
+        query: str,
+        description: Optional[str] = None,
+        resolution: Optional[str] = None,
+        team_id: Optional[int] = None,
+        critical: bool = False
+    ) -> Dict[str, Any]:
+        """Create a new compliance policy in Fleet.
+        
+        Args:
+            name: Name for the policy
+            query: SQL query that defines the policy check
+            description: Optional description of the policy
+            resolution: Optional resolution steps for policy failures
+            team_id: Team ID to associate the policy with
+            critical: Whether this is a critical policy
+            
+        Returns:
+            Dict containing the created policy information.
+        """
+        try:
+            async with client:
+                json_data = {
+                    "name": name,
+                    "query": query,
+                    "critical": critical
+                }
+                
+                if description:
+                    json_data["description"] = description
+                if resolution:
+                    json_data["resolution"] = resolution
+                if team_id is not None:
+                    json_data["team_id"] = team_id
+                
+                response = await client.post("/policies", json_data=json_data)
+                
+                if response.success and response.data:
+                    policy = response.data.get("policy", {})
+                    return {
+                        "success": True,
+                        "policy": policy,
+                        "message": f"Created policy '{name}' with ID {policy.get('id')}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "policy": None
+                    }
+        
+        except FleetAPIError as e:
+            logger.error(f"Failed to create policy: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to create policy: {str(e)}",
+                "policy": None
+            }
+    
+    @mcp.tool()
+    async def fleet_get_policy_results(
+        policy_id: int,
+        team_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Get compliance results for a specific policy.
+        
+        Args:
+            policy_id: ID of the policy to get results for
+            team_id: Filter results by team ID
+            
+        Returns:
+            Dict containing policy compliance results.
+        """
+        try:
+            async with client:
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+                
+                response = await client.get(f"/policies/{policy_id}", params=params)
+                
+                if response.success and response.data:
+                    policy = response.data.get("policy", {})
+                    return {
+                        "success": True,
+                        "policy": policy,
+                        "policy_id": policy_id,
+                        "passing_host_count": policy.get("passing_host_count", 0),
+                        "failing_host_count": policy.get("failing_host_count", 0),
+                        "message": f"Policy '{policy.get('name')}' results retrieved"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "policy": None,
+                        "policy_id": policy_id
+                    }
+        
+        except FleetAPIError as e:
+            logger.error(f"Failed to get policy results: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get policy results: {str(e)}",
+                "policy": None,
+                "policy_id": policy_id
+            }
+    
+    @mcp.tool()
+    async def fleet_update_policy(
+        policy_id: int,
+        name: Optional[str] = None,
+        query: Optional[str] = None,
+        description: Optional[str] = None,
+        resolution: Optional[str] = None,
+        critical: Optional[bool] = None
+    ) -> Dict[str, Any]:
+        """Update an existing policy in Fleet.
+        
+        Args:
+            policy_id: ID of the policy to update
+            name: New name for the policy
+            query: New SQL query for the policy
+            description: New description for the policy
+            resolution: New resolution steps for the policy
+            critical: Whether this is a critical policy
+            
+        Returns:
+            Dict containing the updated policy information.
+        """
+        try:
+            async with client:
+                json_data = {}
+                
+                if name is not None:
+                    json_data["name"] = name
+                if query is not None:
+                    json_data["query"] = query
+                if description is not None:
+                    json_data["description"] = description
+                if resolution is not None:
+                    json_data["resolution"] = resolution
+                if critical is not None:
+                    json_data["critical"] = critical
+                
+                if not json_data:
+                    return {
+                        "success": False,
+                        "message": "No fields provided to update",
+                        "policy": None,
+                        "policy_id": policy_id
+                    }
+                
+                response = await client.patch(f"/policies/{policy_id}", json_data=json_data)
+                
+                if response.success and response.data:
+                    policy = response.data.get("policy", {})
+                    return {
+                        "success": True,
+                        "policy": policy,
+                        "policy_id": policy_id,
+                        "message": f"Updated policy '{policy.get('name')}'"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "policy": None,
+                        "policy_id": policy_id
+                    }
+        
+        except FleetAPIError as e:
+            logger.error(f"Failed to update policy {policy_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to update policy: {str(e)}",
+                "policy": None,
+                "policy_id": policy_id
+            }
+    
+    @mcp.tool()
+    async def fleet_delete_policy(policy_id: int) -> Dict[str, Any]:
+        """Delete a policy from Fleet.
+        
+        Args:
+            policy_id: ID of the policy to delete
+            
+        Returns:
+            Dict indicating success or failure of the deletion.
+        """
+        try:
+            async with client:
+                response = await client.delete(f"/policies/{policy_id}")
+                
+                return {
+                    "success": response.success,
+                    "message": response.message or f"Policy {policy_id} deleted successfully",
+                    "policy_id": policy_id
+                }
+        
+        except FleetAPIError as e:
+            logger.error(f"Failed to delete policy {policy_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to delete policy: {str(e)}",
+                "policy_id": policy_id
+            }

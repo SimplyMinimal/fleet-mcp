@@ -1,0 +1,16 @@
+[fleet]
+# Fleet server URL (required)
+server_url = "https://your-fleet-instance.com"
+
+# Fleet API token (required)
+# Get this from Fleet UI: My account > Get API token
+api_token = "your-api-token-here"
+
+# Verify SSL certificates (default: true)
+verify_ssl = true
+
+# Request timeout in seconds (default: 30)
+timeout = 30
+
+# Maximum number of retries for failed requests (default: 3)
+max_retries = 3
