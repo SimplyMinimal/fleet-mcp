@@ -41,7 +41,7 @@ class FleetConfig(BaseSettings):
     )
 
     readonly: bool = Field(
-        default=False,
+        default=True,
         description="Enable read-only mode (disables write operations)"
     )
 
@@ -134,7 +134,7 @@ def load_config(config_file: Path | None = None) -> FleetConfig:
             if env_var_name in os.environ:
                 env_value = os.environ[env_var_name]
                 # Convert string values to appropriate types
-                if key in ["verify_ssl"] and isinstance(env_value, str):
+                if key in ["verify_ssl", "readonly"] and isinstance(env_value, str):
                     config_data[key] = env_value.lower() in ("true", "1", "yes", "on")
                 elif key in ["timeout", "max_retries"] and isinstance(env_value, str):
                     config_data[key] = int(env_value)

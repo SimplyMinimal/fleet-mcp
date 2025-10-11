@@ -75,67 +75,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
-    async def fleet_create_policy(
-        name: str,
-        query: str,
-        description: str | None = None,
-        resolution: str | None = None,
-        team_id: int | None = None,
-        critical: bool = False
-    ) -> dict[str, Any]:
-        """Create a new compliance policy in Fleet.
-        
-        Args:
-            name: Name for the policy
-            query: SQL query that defines the policy check
-            description: Optional description of the policy
-            resolution: Optional resolution steps for policy failures
-            team_id: Team ID to associate the policy with
-            critical: Whether this is a critical policy
-            
-        Returns:
-            Dict containing the created policy information.
-        """
-        try:
-            async with client:
-                json_data = {
-                    "name": name,
-                    "query": query,
-                    "critical": critical
-                }
-
-                if description:
-                    json_data["description"] = description
-                if resolution:
-                    json_data["resolution"] = resolution
-                if team_id is not None:
-                    json_data["team_id"] = team_id
-
-                response = await client.post("/policies", json_data=json_data)
-
-                if response.success and response.data:
-                    policy = response.data.get("policy", {})
-                    return {
-                        "success": True,
-                        "policy": policy,
-                        "message": f"Created policy '{name}' with ID {policy.get('id')}"
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": response.message,
-                        "policy": None
-                    }
-
-        except FleetAPIError as e:
-            logger.error(f"Failed to create policy: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to create policy: {str(e)}",
-                "policy": None
-            }
-
-    @mcp.tool()
     async def fleet_get_policy_results(
         policy_id: int,
         team_id: int | None = None
@@ -193,7 +132,66 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         client: Fleet API client
     """
 
+    @mcp.tool()
+    async def fleet_create_policy(
+        name: str,
+        query: str,
+        description: str | None = None,
+        resolution: str | None = None,
+        team_id: int | None = None,
+        critical: bool = False
+    ) -> dict[str, Any]:
+        """Create a new compliance policy in Fleet.
 
+        Args:
+            name: Name for the policy
+            query: SQL query that defines the policy check
+            description: Optional description of the policy
+            resolution: Optional resolution steps for policy failures
+            team_id: Team ID to associate the policy with
+            critical: Whether this is a critical policy
+
+        Returns:
+            Dict containing the created policy information.
+        """
+        try:
+            async with client:
+                json_data = {
+                    "name": name,
+                    "query": query,
+                    "critical": critical
+                }
+
+                if description:
+                    json_data["description"] = description
+                if resolution:
+                    json_data["resolution"] = resolution
+                if team_id is not None:
+                    json_data["team_id"] = team_id
+
+                response = await client.post("/policies", json_data=json_data)
+
+                if response.success and response.data:
+                    policy = response.data.get("policy", {})
+                    return {
+                        "success": True,
+                        "policy": policy,
+                        "message": f"Created policy '{name}' with ID {policy.get('id')}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "policy": None
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to create policy: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to create policy: {str(e)}",
+                "policy": None
+            }
 
     @mcp.tool()
     async def fleet_update_policy(
