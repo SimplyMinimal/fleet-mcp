@@ -1,11 +1,11 @@
 """Team and user management tools for Fleet MCP."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetClient, FleetAPIError
+from ..client import FleetAPIError, FleetClient
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         mcp: FastMCP server instance
         client: Fleet API client
     """
-    
+
     @mcp.tool()
-    async def fleet_list_teams() -> Dict[str, Any]:
+    async def fleet_list_teams() -> dict[str, Any]:
         """List all teams in Fleet.
         
         Returns:
@@ -39,7 +39,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 response = await client.get("/teams")
-                
+
                 if response.success and response.data:
                     teams = response.data.get("teams", [])
                     return {
@@ -55,7 +55,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "teams": [],
                         "count": 0
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to list teams: {e}")
             return {
@@ -66,7 +66,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
-    async def fleet_get_team(team_id: int) -> Dict[str, Any]:
+    async def fleet_get_team(team_id: int) -> dict[str, Any]:
         """Get details of a specific team.
         
         Args:
@@ -78,7 +78,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 response = await client.get(f"/teams/{team_id}")
-                
+
                 if response.success and response.data:
                     team = response.data.get("team", {})
                     return {
@@ -94,7 +94,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "team": None,
                         "team_id": team_id
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to get team {team_id}: {e}")
             return {
@@ -103,7 +103,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "team": None,
                 "team_id": team_id
             }
-    
+
     @mcp.tool()
     async def fleet_list_users(
         page: int = 0,
@@ -111,8 +111,8 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         order_key: str = "name",
         order_direction: str = "asc",
         query: str = "",
-        team_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+        team_id: int | None = None
+    ) -> dict[str, Any]:
         """List all users in Fleet.
         
         Args:
@@ -134,14 +134,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "order_key": order_key,
                     "order_direction": order_direction
                 }
-                
+
                 if query:
                     params["query"] = query
                 if team_id is not None:
                     params["team_id"] = team_id
-                
+
                 response = await client.get("/users", params=params)
-                
+
                 if response.success and response.data:
                     users = response.data.get("users", [])
                     return {
@@ -159,7 +159,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "users": [],
                         "count": 0
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to list users: {e}")
             return {
@@ -168,9 +168,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "users": [],
                 "count": 0
             }
-    
+
     @mcp.tool()
-    async def fleet_get_user(user_id: int) -> Dict[str, Any]:
+    async def fleet_get_user(user_id: int) -> dict[str, Any]:
         """Get details of a specific user.
         
         Args:
@@ -182,7 +182,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 response = await client.get(f"/users/{user_id}")
-                
+
                 if response.success and response.data:
                     user = response.data.get("user", {})
                     return {
@@ -198,7 +198,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "user": None,
                         "user_id": user_id
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to get user {user_id}: {e}")
             return {
@@ -207,14 +207,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "user": None,
                 "user_id": user_id
             }
-    
+
     @mcp.tool()
     async def fleet_list_activities(
         page: int = 0,
         per_page: int = 100,
         order_key: str = "created_at",
         order_direction: str = "desc"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """List Fleet activities and audit logs.
         
         Args:
@@ -234,9 +234,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "order_key": order_key,
                     "order_direction": order_direction
                 }
-                
+
                 response = await client.get("/activities", params=params)
-                
+
                 if response.success and response.data:
                     activities = response.data.get("activities", [])
                     return {
@@ -254,7 +254,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "activities": [],
                         "count": 0
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to list activities: {e}")
             return {
@@ -276,8 +276,8 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_create_team(
         name: str,
-        description: Optional[str] = None
-    ) -> Dict[str, Any]:
+        description: str | None = None
+    ) -> dict[str, Any]:
         """Create a new team in Fleet.
 
         Args:

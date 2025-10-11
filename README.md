@@ -13,8 +13,14 @@ A Model Context Protocol (MCP) tool that enables agentic AIs to interact with [F
 
 ## Installation
 
+### Using pip
 ```bash
 pip install fleet-mcp
+```
+
+### Using uv (recommended for development)
+```bash
+uv add fleet-mcp
 ```
 
 ## Quick Start
@@ -173,27 +179,49 @@ When read-only mode is enabled, only the following operations are available:
 
 ## Development
 
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management and development workflows.
+
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/fleet-mcp/fleet-mcp.git
    cd fleet-mcp
    ```
 
-2. **Install development dependencies**:
+2. **Install dependencies** (uv will automatically create a virtual environment):
    ```bash
-   pip install -e ".[dev]"
+   uv sync --dev
    ```
 
 3. **Run tests**:
    ```bash
-   pytest
+   uv run pytest
    ```
 
 4. **Format code**:
    ```bash
-   black src tests
-   isort src tests
+   uv run black src tests
+   uv run isort src tests
    ```
+
+5. **Type checking**:
+   ```bash
+   uv run mypy src
+   ```
+
+6. **Linting**:
+   ```bash
+   uv run ruff check src tests
+   ```
+
+7. **Run the CLI**:
+   ```bash
+   uv run fleet-mcp
+   ```
+
+### Adding Dependencies
+
+- **Runtime dependencies**: `uv add package-name`
+- **Development dependencies**: `uv add --group dev package-name`
 
 ## Contributing
 

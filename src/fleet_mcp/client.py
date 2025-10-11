@@ -2,8 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urljoin
+from typing import Any
 
 import httpx
 from pydantic import BaseModel
@@ -15,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class FleetAPIError(Exception):
     """Base exception for Fleet API errors."""
-    
-    def __init__(self, message: str, status_code: Optional[int] = None, response_data: Optional[Dict[str, Any]] = None):
+
+    def __init__(self, message: str, status_code: int | None = None, response_data: dict[str, Any] | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.response_data = response_data or {}
@@ -39,17 +38,17 @@ class FleetValidationError(FleetAPIError):
 
 class FleetResponse(BaseModel):
     """Standardized response from Fleet API operations."""
-    
+
     success: bool
-    data: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] | None = None
     message: str
-    status_code: Optional[int] = None
-    metadata: Optional[Dict[str, Any]] = None
+    status_code: int | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class FleetClient:
     """HTTP client for Fleet DM API interactions."""
-    
+
     def __init__(self, config: FleetConfig):
         """Initialize Fleet client with configuration.
         
@@ -57,17 +56,17 @@ class FleetClient:
             config: Fleet configuration instance
         """
         self.config = config
-        self._client: Optional[httpx.AsyncClient] = None
-        
+        self._client: httpx.AsyncClient | None = None
+
     async def __aenter__(self) -> "FleetClient":
         """Async context manager entry."""
         await self._ensure_client()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit."""
         await self.close()
-    
+
     async def _ensure_client(self) -> None:
         """Ensure HTTP client is initialized."""
         if self._client is None:
@@ -81,13 +80,13 @@ class FleetClient:
                     "User-Agent": self.config.user_agent,
                 }
             )
-    
+
     async def close(self) -> None:
         """Close the HTTP client."""
         if self._client:
             await self._client.aclose()
             self._client = None
-    
+
     def _build_url(self, endpoint: str) -> str:
         """Build full URL for API endpoint.
         
@@ -100,19 +99,19 @@ class FleetClient:
         # Ensure endpoint starts with /
         if not endpoint.startswith("/"):
             endpoint = f"/{endpoint}"
-        
+
         # Fleet API endpoints typically start with /api/v1/fleet/
         if not endpoint.startswith("/api/"):
             endpoint = f"/api/v1/fleet{endpoint}"
-        
+
         return endpoint
-    
+
     async def _make_request(
         self,
         method: str,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
         retry_count: int = 0
     ) -> FleetResponse:
         """Make HTTP request to Fleet API with error handling and retries.
@@ -131,19 +130,19 @@ class FleetClient:
             FleetAPIError: For various API errors
         """
         await self._ensure_client()
-        
+
         url = self._build_url(endpoint)
-        
+
         try:
             logger.debug(f"Making {method} request to {url}")
-            
+
             response = await self._client.request(
                 method=method,
                 url=url,
                 params=params,
                 json=json_data
             )
-            
+
             # Handle different response status codes
             if response.status_code == 200:
                 try:
@@ -162,7 +161,7 @@ class FleetClient:
                         message="Request successful (non-JSON response)",
                         status_code=response.status_code
                     )
-            
+
             elif response.status_code == 401:
                 error_data = self._parse_error_response(response)
                 raise FleetAuthenticationError(
@@ -170,7 +169,7 @@ class FleetClient:
                     status_code=response.status_code,
                     response_data=error_data
                 )
-            
+
             elif response.status_code == 404:
                 error_data = self._parse_error_response(response)
                 raise FleetNotFoundError(
@@ -178,7 +177,7 @@ class FleetClient:
                     status_code=response.status_code,
                     response_data=error_data
                 )
-            
+
             elif response.status_code == 422:
                 error_data = self._parse_error_response(response)
                 raise FleetValidationError(
@@ -186,7 +185,7 @@ class FleetClient:
                     status_code=response.status_code,
                     response_data=error_data
                 )
-            
+
             else:
                 error_data = self._parse_error_response(response)
                 raise FleetAPIError(
@@ -194,18 +193,18 @@ class FleetClient:
                     status_code=response.status_code,
                     response_data=error_data
                 )
-        
+
         except httpx.TimeoutException:
             if retry_count < self.config.max_retries:
                 logger.warning(f"Request timeout, retrying ({retry_count + 1}/{self.config.max_retries})")
                 await asyncio.sleep(2 ** retry_count)  # Exponential backoff
                 return await self._make_request(method, endpoint, params, json_data, retry_count + 1)
-            
+
             raise FleetAPIError("Request timed out after retries")
-        
+
         except httpx.ConnectError:
             raise FleetAPIError(f"Failed to connect to Fleet server at {self.config.server_url}")
-        
+
         except FleetAPIError:
             # Don't retry Fleet API errors (auth, validation, etc.)
             raise
@@ -217,8 +216,8 @@ class FleetClient:
                 return await self._make_request(method, endpoint, params, json_data, retry_count + 1)
 
             raise FleetAPIError(f"Unexpected error: {str(e)}")
-    
-    def _parse_error_response(self, response: httpx.Response) -> Dict[str, Any]:
+
+    def _parse_error_response(self, response: httpx.Response) -> dict[str, Any]:
         """Parse error response from Fleet API.
         
         Args:
@@ -231,24 +230,24 @@ class FleetClient:
             return response.json()
         except Exception:
             return {"message": response.text or "Unknown error", "status_code": response.status_code}
-    
+
     # HTTP method helpers
-    async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> FleetResponse:
+    async def get(self, endpoint: str, params: dict[str, Any] | None = None) -> FleetResponse:
         """Make GET request."""
         return await self._make_request("GET", endpoint, params=params)
-    
-    async def post(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None) -> FleetResponse:
+
+    async def post(self, endpoint: str, json_data: dict[str, Any] | None = None) -> FleetResponse:
         """Make POST request."""
         return await self._make_request("POST", endpoint, json_data=json_data)
-    
-    async def patch(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None) -> FleetResponse:
+
+    async def patch(self, endpoint: str, json_data: dict[str, Any] | None = None) -> FleetResponse:
         """Make PATCH request."""
         return await self._make_request("PATCH", endpoint, json_data=json_data)
-    
+
     async def delete(self, endpoint: str) -> FleetResponse:
         """Make DELETE request."""
         return await self._make_request("DELETE", endpoint)
-    
+
     # Health check
     async def health_check(self) -> FleetResponse:
         """Check if Fleet server is accessible and authentication works.

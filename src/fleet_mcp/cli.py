@@ -3,11 +3,10 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 
-from .config import FleetConfig, load_config, get_default_config_file
+from .config import FleetConfig, get_default_config_file, load_config
 from .server import FleetMCPServer
 
 
@@ -43,10 +42,10 @@ from .server import FleetMCPServer
 @click.pass_context
 def cli(
     ctx: click.Context,
-    config: Optional[Path],
+    config: Path | None,
     verbose: bool,
-    server_url: Optional[str],
-    api_token: Optional[str],
+    server_url: str | None,
+    api_token: str | None,
     readonly: bool
 ) -> None:
     """Fleet MCP - Model Context Protocol tool for Fleet DM integration."""
@@ -56,7 +55,7 @@ def cli(
         level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     # Store config parameters in context for commands that need them
     ctx.ensure_object(dict)
     ctx.obj["config_file"] = config
@@ -128,7 +127,7 @@ async def test(ctx: click.Context) -> None:
 
             if response.success:
                 click.echo(f"✅ Successfully connected to Fleet server at {config.server_url}")
-                click.echo(f"   Authentication: OK")
+                click.echo("   Authentication: OK")
             else:
                 click.echo(f"❌ Failed to connect to Fleet server: {response.message}")
                 sys.exit(1)
@@ -165,17 +164,17 @@ timeout = 30
 # Maximum number of retries for failed requests (default: 3)
 max_retries = 3
 """
-    
+
     try:
         if output.exists():
             if not click.confirm(f"Configuration file {output} already exists. Overwrite?"):
                 click.echo("Configuration file creation cancelled.")
                 return
-        
+
         output.write_text(config_template)
         click.echo(f"✅ Configuration template created at {output}")
         click.echo("Please edit the file and add your Fleet server URL and API token.")
-        
+
     except Exception as e:
         click.echo(f"❌ Failed to create configuration file: {e}", err=True)
         sys.exit(1)

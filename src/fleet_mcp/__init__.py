@@ -15,6 +15,6 @@ from .server import FleetMCPServer
 
 __all__ = [
     "FleetClient",
-    "FleetConfig", 
+    "FleetConfig",
     "FleetMCPServer",
 ]

@@ -2,9 +2,8 @@
 
 import os
 from pathlib import Path
-from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -92,7 +91,7 @@ class FleetConfig(BaseSettings):
     }
 
 
-def load_config(config_file: Optional[Path] = None) -> FleetConfig:
+def load_config(config_file: Path | None = None) -> FleetConfig:
     """Load configuration from environment variables and optional config file.
 
     Args:
@@ -154,19 +153,19 @@ def get_default_config_file() -> Path:
     current_dir_config = Path("fleet-mcp.toml")
     if current_dir_config.exists():
         return current_dir_config
-    
+
     # Check user home directory
     home_config = Path.home() / ".fleet-mcp.toml"
     if home_config.exists():
         return home_config
-    
+
     # Check XDG config directory
     xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
     if xdg_config_home:
         xdg_config = Path(xdg_config_home) / "fleet-mcp" / "config.toml"
         if xdg_config.exists():
             return xdg_config
-    
+
     # Default XDG location
     default_xdg = Path.home() / ".config" / "fleet-mcp" / "config.toml"
     return default_xdg

@@ -1,11 +1,11 @@
 """Query management tools for Fleet MCP."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetClient, FleetAPIError
+from ..client import FleetAPIError, FleetClient
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +28,15 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         mcp: FastMCP server instance
         client: Fleet API client
     """
-    
+
     @mcp.tool()
     async def fleet_list_queries(
         page: int = 0,
         per_page: int = 100,
         order_key: str = "name",
         order_direction: str = "asc",
-        team_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+        team_id: int | None = None
+    ) -> dict[str, Any]:
         """List all saved queries in Fleet.
         
         Args:
@@ -57,12 +57,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "order_key": order_key,
                     "order_direction": order_direction
                 }
-                
+
                 if team_id is not None:
                     params["team_id"] = team_id
-                
+
                 response = await client.get("/queries", params=params)
-                
+
                 if response.success and response.data:
                     queries = response.data.get("queries", [])
                     return {
@@ -80,7 +80,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "queries": [],
                         "count": 0
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to list queries: {e}")
             return {
@@ -89,11 +89,11 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "queries": [],
                 "count": 0
             }
-    
 
-    
+
+
     @mcp.tool()
-    async def fleet_get_query_results(campaign_id: int) -> Dict[str, Any]:
+    async def fleet_get_query_results(campaign_id: int) -> dict[str, Any]:
         """Get results from a live query campaign.
         
         Args:
@@ -105,7 +105,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 response = await client.get(f"/queries/{campaign_id}/results")
-                
+
                 if response.success and response.data:
                     results = response.data.get("results", [])
                     return {
@@ -123,7 +123,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "campaign_id": campaign_id,
                         "result_count": 0
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to get query results: {e}")
             return {
@@ -133,9 +133,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "campaign_id": campaign_id,
                 "result_count": 0
             }
-    
+
     @mcp.tool()
-    async def fleet_get_query(query_id: int) -> Dict[str, Any]:
+    async def fleet_get_query(query_id: int) -> dict[str, Any]:
         """Get details of a specific saved query.
         
         Args:
@@ -147,7 +147,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 response = await client.get(f"/queries/{query_id}")
-                
+
                 if response.success and response.data:
                     query_data = response.data.get("query", {})
                     return {
@@ -163,7 +163,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "query": None,
                         "query_id": query_id
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to get query {query_id}: {e}")
             return {
@@ -186,10 +186,10 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     async def fleet_create_query(
         name: str,
         query: str,
-        description: Optional[str] = None,
-        team_id: Optional[int] = None,
+        description: str | None = None,
+        team_id: int | None = None,
         observer_can_run: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a new saved query in Fleet.
 
         Args:
@@ -243,10 +243,10 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_run_live_query(
         query: str,
-        host_ids: Optional[List[int]] = None,
-        label_ids: Optional[List[int]] = None,
-        team_ids: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
+        host_ids: list[int] | None = None,
+        label_ids: list[int] | None = None,
+        team_ids: list[int] | None = None
+    ) -> dict[str, Any]:
         """Execute a live query against specified hosts.
 
         Args:
@@ -299,7 +299,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
-    async def fleet_delete_query(query_id: int) -> Dict[str, Any]:
+    async def fleet_delete_query(query_id: int) -> dict[str, Any]:
         """Delete a saved query from Fleet.
         
         Args:
@@ -311,13 +311,13 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 response = await client.delete(f"/queries/{query_id}")
-                
+
                 return {
                     "success": response.success,
                     "message": response.message or f"Query {query_id} deleted successfully",
                     "query_id": query_id
                 }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to delete query {query_id}: {e}")
             return {
@@ -325,14 +325,14 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to delete query: {str(e)}",
                 "query_id": query_id
             }
-    
+
     @mcp.tool()
     async def fleet_run_saved_query(
         query_id: int,
-        host_ids: Optional[List[int]] = None,
-        label_ids: Optional[List[int]] = None,
-        team_ids: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
+        host_ids: list[int] | None = None,
+        label_ids: list[int] | None = None,
+        team_ids: list[int] | None = None
+    ) -> dict[str, Any]:
         """Run a saved query against specified hosts.
         
         Args:
@@ -353,9 +353,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "teams": team_ids or []
                     }
                 }
-                
+
                 response = await client.post(f"/queries/{query_id}/run", json_data=json_data)
-                
+
                 if response.success and response.data:
                     campaign = response.data.get("campaign", {})
                     return {
@@ -372,7 +372,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "campaign": None,
                         "query_id": query_id
                     }
-        
+
         except FleetAPIError as e:
             logger.error(f"Failed to run saved query {query_id}: {e}")
             return {

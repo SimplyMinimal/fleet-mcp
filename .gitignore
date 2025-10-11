@@ -109,6 +109,9 @@ ipython_config.py
 #   https://pdm.fming.dev/#use-with-ide
 .pdm.toml
 
+# uv
+.venv/
+
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
@@ -169,3 +172,5 @@ cython_debug/
 fleet-mcp.toml
 *.log
 .fleet-mcp/
+docker/
+.python-version

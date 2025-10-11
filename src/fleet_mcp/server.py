@@ -1,21 +1,21 @@
 """Fleet MCP Server - Main MCP server implementation."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from .client import FleetClient, FleetAPIError
-from .config import FleetConfig, load_config, get_default_config_file
-from .tools import host_tools, query_tools, policy_tools, software_tools, team_tools
+from .client import FleetClient
+from .config import FleetConfig, get_default_config_file, load_config
+from .tools import host_tools, policy_tools, query_tools, software_tools, team_tools
 
 logger = logging.getLogger(__name__)
 
 
 class FleetMCPServer:
     """Fleet MCP Server for handling Fleet DM interactions."""
-    
-    def __init__(self, config: Optional[FleetConfig] = None):
+
+    def __init__(self, config: FleetConfig | None = None):
         """Initialize Fleet MCP Server.
         
         Args:
@@ -24,10 +24,10 @@ class FleetMCPServer:
         if config is None:
             config_file = get_default_config_file()
             config = load_config(config_file if config_file.exists() else None)
-        
+
         self.config = config
         self.client = FleetClient(config)
-        
+
         # Initialize FastMCP server
         readonly_note = " (READ-ONLY MODE - no write operations available)" if self.config.readonly else ""
         self.mcp = FastMCP(
@@ -48,10 +48,10 @@ class FleetMCPServer:
             Always provide clear, actionable information in your responses.
             """
         )
-        
+
         # Register all tool categories
         self._register_tools()
-    
+
     def _register_tools(self) -> None:
         """Register MCP tools with the server based on configuration."""
         # Always register read-only tools
@@ -70,12 +70,12 @@ class FleetMCPServer:
 
         # Register server health check tool (always available)
         self._register_health_check()
-    
+
     def _register_health_check(self) -> None:
         """Register health check tool."""
-        
+
         @self.mcp.tool()
-        async def fleet_health_check() -> Dict[str, Any]:
+        async def fleet_health_check() -> dict[str, Any]:
             """Check Fleet server connectivity and authentication.
             
             Returns:
@@ -84,7 +84,7 @@ class FleetMCPServer:
             try:
                 async with self.client:
                     response = await self.client.health_check()
-                    
+
                     return {
                         "success": response.success,
                         "message": response.message,
@@ -92,7 +92,7 @@ class FleetMCPServer:
                         "status": "healthy" if response.success else "unhealthy",
                         "details": response.data or {}
                     }
-            
+
             except Exception as e:
                 logger.error(f"Health check failed: {e}")
                 return {
@@ -101,14 +101,14 @@ class FleetMCPServer:
                     "server_url": self.config.server_url,
                     "status": "error"
                 }
-    
+
     def run(self) -> None:
         """Run the MCP server."""
         logger.info(f"Starting Fleet MCP Server for {self.config.server_url}")
         self.mcp.run()
 
 
-def create_server(config: Optional[FleetConfig] = None) -> FleetMCPServer:
+def create_server(config: FleetConfig | None = None) -> FleetMCPServer:
     """Create and configure Fleet MCP Server.
     
     Args:
@@ -127,7 +127,7 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     try:
         server = create_server()
         server.run()
