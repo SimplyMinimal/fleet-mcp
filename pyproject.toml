@@ -37,10 +37,10 @@ dependencies = [
 
 
 [project.urls]
-Homepage = "https://github.com/fleet-mcp/fleet-mcp"
-Repository = "https://github.com/fleet-mcp/fleet-mcp"
-Issues = "https://github.com/fleet-mcp/fleet-mcp/issues"
-Documentation = "https://github.com/fleet-mcp/fleet-mcp#readme"
+Homepage = "https://github.com/SimplyMinimal/fleet-mcp"
+Repository = "https://github.com/SimplyMinimal/fleet-mcp"
+Issues = "https://github.com/SimplyMinimal/fleet-mcp/issues"
+Documentation = "https://github.com/SimplyMinimal/fleet-mcp#readme"
 
 [project.scripts]
 fleet-mcp = "fleet_mcp.cli:main"
