@@ -132,47 +132,51 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_get_host_software(
         host_id: int,
-        page: int = 0,
-        per_page: int = 100,
         query: str = "",
         vulnerable: bool | None = None
     ) -> dict[str, Any]:
         """Get software installed on a specific host.
-        
+
         Args:
             host_id: ID of the host to get software for
-            page: Page number for pagination (0-based)
-            per_page: Number of software items per page
-            query: Search query to filter software by name
+            query: Search query to filter software by name (case-insensitive)
             vulnerable: Filter to only vulnerable software (true) or non-vulnerable (false)
-            
+
         Returns:
             Dict containing software installed on the host.
         """
         try:
             async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page
-                }
-
-                if query:
-                    params["query"] = query
-                if vulnerable is not None:
-                    params["vulnerable"] = str(vulnerable).lower()
-
-                response = await client.get(f"/hosts/{host_id}/software", params=params)
+                # Use the standard host endpoint which includes software by default
+                response = await client.get(f"/hosts/{host_id}")
 
                 if response.success and response.data:
-                    software = response.data.get("software", [])
+                    host = response.data.get("host", {})
+                    all_software = host.get("software", [])
+
+                    # Filter software based on query and vulnerable parameters
+                    filtered_software = []
+                    for software in all_software:
+                        # Apply query filter (case-insensitive search in name)
+                        if query and query.lower() not in software.get("name", "").lower():
+                            continue
+
+                        # Apply vulnerable filter
+                        if vulnerable is not None:
+                            software_vulnerable = len(software.get("vulnerabilities", [])) > 0
+                            if vulnerable != software_vulnerable:
+                                continue
+
+                        filtered_software.append(software)
+
                     return {
                         "success": True,
-                        "software": software,
-                        "count": len(software),
+                        "software": filtered_software,
+                        "count": len(filtered_software),
+                        "total_software": len(all_software),
                         "host_id": host_id,
-                        "page": page,
-                        "per_page": per_page,
-                        "message": f"Found {len(software)} software items on host {host_id}"
+                        "hostname": host.get("hostname", "Unknown"),
+                        "message": f"Found {len(filtered_software)} software items on host {host.get('hostname', host_id)}"
                     }
                 else:
                     return {
@@ -180,7 +184,9 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "message": response.message,
                         "software": [],
                         "count": 0,
-                        "host_id": host_id
+                        "total_software": 0,
+                        "host_id": host_id,
+                        "hostname": "Unknown"
                     }
 
         except FleetAPIError as e:
@@ -190,7 +196,9 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to get host software: {str(e)}",
                 "software": [],
                 "count": 0,
-                "host_id": host_id
+                "total_software": 0,
+                "host_id": host_id,
+                "hostname": "Unknown"
             }
 
     @mcp.tool()
@@ -267,17 +275,19 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
     async def fleet_search_software(
         query: str,
         limit: int = 50,
-        team_id: int | None = None
+        team_id: int | None = None,
+        vulnerable: bool | None = None
     ) -> dict[str, Any]:
         """Search for software by name across the fleet.
-        
+
         Args:
             query: Search term for software name
             limit: Maximum number of results to return
             team_id: Filter search by team ID
-            
+            vulnerable: Filter to only vulnerable software (true) or non-vulnerable (false)
+
         Returns:
-            Dict containing matching software items.
+            Dict containing matching software titles.
         """
         try:
             async with client:
@@ -289,22 +299,26 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 if team_id is not None:
                     params["team_id"] = team_id
 
-                response = await client.get("/software", params=params)
+                if vulnerable is not None:
+                    params["vulnerable"] = str(vulnerable).lower()
+
+                # Use the correct software titles endpoint
+                response = await client.get("/software/titles", params=params)
 
                 if response.success and response.data:
-                    software = response.data.get("software", [])
+                    software_titles = response.data.get("software_titles", [])
                     return {
                         "success": True,
-                        "software": software,
-                        "count": len(software),
+                        "software_titles": software_titles,
+                        "count": len(software_titles),
                         "query": query,
-                        "message": f"Found {len(software)} software items matching '{query}'"
+                        "message": f"Found {len(software_titles)} software titles matching '{query}'"
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
-                        "software": [],
+                        "software_titles": [],
                         "count": 0,
                         "query": query
                     }
@@ -314,7 +328,90 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to search software: {str(e)}",
-                "software": [],
+                "software_titles": [],
                 "count": 0,
                 "query": query
+            }
+
+    @mcp.tool()
+    async def fleet_find_software_on_host(
+        hostname: str,
+        software_name: str
+    ) -> dict[str, Any]:
+        """Find specific software on a host by hostname.
+
+        This is useful for answering questions like "What version of Firefox is XYZ-Machine using?"
+
+        Args:
+            hostname: The hostname of the host to search
+            software_name: The name of the software to find (case-insensitive)
+
+        Returns:
+            Dict containing the software information if found.
+        """
+        try:
+            async with client:
+                # First, find the host by hostname
+                host_response = await client.get("/hosts", params={"query": hostname})
+
+                if not host_response.success or not host_response.data:
+                    return {
+                        "success": False,
+                        "message": f"Failed to find host with hostname '{hostname}': {host_response.message}",
+                        "hostname": hostname,
+                        "software_name": software_name,
+                        "software": []
+                    }
+
+                hosts = host_response.data.get("hosts", [])
+                target_host = None
+
+                # Find exact hostname match
+                for host in hosts:
+                    if host.get("hostname", "").lower() == hostname.lower():
+                        target_host = host
+                        break
+
+                if not target_host:
+                    return {
+                        "success": False,
+                        "message": f"No host found with exact hostname '{hostname}'. Found {len(hosts)} hosts matching the search.",
+                        "hostname": hostname,
+                        "software_name": software_name,
+                        "software": [],
+                        "similar_hosts": [h.get("hostname", "Unknown") for h in hosts[:5]]
+                    }
+
+                # Get software for the host
+                host_id = target_host.get("id")
+                software_response = await self.fleet_get_host_software(host_id, query=software_name)
+
+                if software_response.get("success"):
+                    matching_software = software_response.get("software", [])
+                    return {
+                        "success": True,
+                        "hostname": target_host.get("hostname"),
+                        "host_id": host_id,
+                        "software_name": software_name,
+                        "software": matching_software,
+                        "count": len(matching_software),
+                        "message": f"Found {len(matching_software)} software items matching '{software_name}' on host '{hostname}'"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"Failed to get software for host '{hostname}': {software_response.get('message')}",
+                        "hostname": hostname,
+                        "software_name": software_name,
+                        "software": []
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to find software on host: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to find software on host: {str(e)}",
+                "hostname": hostname,
+                "software_name": software_name,
+                "software": []
             }
