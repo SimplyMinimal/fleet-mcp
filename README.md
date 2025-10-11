@@ -58,12 +58,14 @@ uv add fleet-mcp
 - `fleet_get_host` - Get detailed information about a specific host
 - `fleet_search_hosts` - Search hosts by various criteria
 - `fleet_delete_host` - Remove a host from Fleet
+- `fleet_query_host` - Run an ad-hoc live query against a specific host
+- `fleet_query_host_by_identifier` - Run an ad-hoc live query by identifier
 
 ### Query Management
 - `fleet_list_queries` - List all saved queries
 - `fleet_create_query` - Create a new saved query
 - `fleet_run_live_query` - Execute a live query against hosts
-- `fleet_get_query_results` - Get results from a query execution
+- `fleet_get_query_report` - Get results from a scheduled query
 
 ### Policy Management
 - `fleet_list_policies` - List all policies
@@ -79,6 +81,11 @@ uv add fleet-mcp
 - `fleet_list_teams` - List all teams
 - `fleet_list_users` - List all users
 - `fleet_create_team` - Create a new team
+
+### Osquery Table Reference
+- `fleet_list_osquery_tables` - List all available osquery tables with filtering
+- `fleet_get_osquery_table_schema` - Get detailed schema for a specific table
+- `fleet_suggest_tables_for_query` - Get table suggestions based on query intent
 
 ## Configuration
 
