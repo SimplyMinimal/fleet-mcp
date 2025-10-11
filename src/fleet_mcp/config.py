@@ -45,6 +45,11 @@ class FleetConfig(BaseSettings):
         description="Enable read-only mode (disables write operations)"
     )
 
+    allow_select_queries: bool = Field(
+        default=False,
+        description="Allow SELECT-only queries in read-only mode (enables fleet_run_live_query, fleet_run_saved_query, fleet_query_host with validation)"
+    )
+
     @field_validator("server_url")
     @classmethod
     def validate_server_url(cls, v: str) -> str:
@@ -134,7 +139,7 @@ def load_config(config_file: Path | None = None) -> FleetConfig:
             if env_var_name in os.environ:
                 env_value = os.environ[env_var_name]
                 # Convert string values to appropriate types
-                if key in ["verify_ssl", "readonly"] and isinstance(env_value, str):
+                if key in ["verify_ssl", "readonly", "allow_select_queries"] and isinstance(env_value, str):
                     config_data[key] = env_value.lower() in ("true", "1", "yes", "on")
                 elif key in ["timeout", "max_retries"] and isinstance(env_value, str):
                     config_data[key] = int(env_value)

@@ -96,7 +96,8 @@ Fleet MCP can be configured via environment variables or a configuration file:
 - `FLEET_API_TOKEN` - API authentication token (required)
 - `FLEET_VERIFY_SSL` - Verify SSL certificates (default: true)
 - `FLEET_TIMEOUT` - Request timeout in seconds (default: 30)
-- `FLEET_READONLY` - Enable read-only mode (default: false)
+- `FLEET_READONLY` - Enable read-only mode (default: true)
+- `FLEET_ALLOW_SELECT_QUERIES` - Allow SELECT-only queries in read-only mode (default: false)
 
 ### Configuration File
 Create a `fleet-mcp.toml` file:
@@ -107,18 +108,43 @@ server_url = "https://your-fleet-instance.com"
 api_token = "your-api-token"
 verify_ssl = true
 timeout = 30
-readonly = false
+readonly = false  # Set to false to enable write operations (default: true)
+allow_select_queries = true  # Allow SELECT queries in read-only mode (default: false)
 ```
 
 ## Read-Only Mode
 
-Fleet MCP supports a read-only mode that disables all write operations, providing a safe way to explore and monitor your Fleet instance without risk of making changes.
+Fleet MCP runs in **read-only mode by default** to provide a safe way to explore and monitor your Fleet instance without risk of making changes. Write operations are disabled unless explicitly enabled.
 
-### Enabling Read-Only Mode
+### Read-Only Mode Options
+
+There are three operational modes:
+
+1. **Strict Read-Only Mode** (default: `readonly=true`, `allow_select_queries=false`)
+   - Only viewing operations are available
+   - No data modification or query execution
+   - Safest option for exploration
+
+2. **Read-Only with SELECT Queries** (`readonly=true`, `allow_select_queries=true`)
+   - Viewing operations available
+   - Can run SELECT-only queries for monitoring and investigation
+   - All queries are validated to ensure they're SELECT-only
+   - No INSERT, UPDATE, DELETE, or other data modification operations
+   - Ideal for monitoring and troubleshooting without risk
+
+3. **Full Write Mode** (`readonly=false`)
+   - All operations available including data modification
+   - Query validation is disabled
+   - Use with caution
+
+### Enabling SELECT Queries in Read-Only Mode
+
+To enable SELECT-only query execution while maintaining read-only protection:
 
 **Environment Variable:**
 ```bash
 export FLEET_READONLY=true
+export FLEET_ALLOW_SELECT_QUERIES=true
 fleet-mcp run
 ```
 
@@ -126,23 +152,63 @@ fleet-mcp run
 ```toml
 [fleet]
 readonly = true
-```
-
-**Command Line:**
-```bash
-fleet-mcp --readonly run
+allow_select_queries = true
 ```
 
 **Claude Desktop Configuration:**
 ```json
 {
   "mcpServers": {
-    "fleet-readonly": {
+    "fleet-readonly-queries": {
       "command": "fleet-mcp",
-      "args": ["--readonly", "run"],
       "env": {
         "FLEET_SERVER_URL": "https://your-fleet-instance.com",
-        "FLEET_API_TOKEN": "your-api-token"
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+**Available Query Tools in This Mode:**
+- `fleet_run_live_query` - Execute SELECT-only live queries (validated)
+- `fleet_run_saved_query` - Run saved queries (validated to be SELECT-only)
+- `fleet_query_host` - Run SELECT-only queries against specific hosts (validated)
+- `fleet_query_host_by_identifier` - Run SELECT-only queries by host identifier (validated)
+
+All queries are automatically validated before execution. Any query containing INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, or other data modification operations will be rejected with a clear error message.
+
+### Disabling Read-Only Mode (Enabling Write Operations)
+
+**Environment Variable:**
+```bash
+export FLEET_READONLY=false
+fleet-mcp run
+```
+
+**Configuration File:**
+```toml
+[fleet]
+readonly = false
+```
+
+**Command Line:**
+```bash
+fleet-mcp --no-readonly run
+```
+
+**Claude Desktop Configuration:**
+```json
+{
+  "mcpServers": {
+    "fleet-write": {
+      "command": "fleet-mcp",
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "false"
       }
     }
   }
