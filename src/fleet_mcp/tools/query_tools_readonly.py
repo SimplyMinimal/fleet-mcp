@@ -60,7 +60,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
         
         try:
             async with client:
-                json_data = {"query": query}
+                json_data: dict[str, Any] = {"query": query}
 
                 # Add targeting parameters if provided
                 if host_ids:
@@ -147,7 +147,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                     }
                 
                 # Run the query
-                json_data = {"query_id": query_id}
+                json_data: dict[str, Any] = {"query_id": query_id}
 
                 # Add targeting parameters if provided
                 if host_ids:

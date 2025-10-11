@@ -26,7 +26,7 @@ class FleetMCPServer:
             config_file = get_default_config_file()
             config = load_config(config_file if config_file.exists() else None)
 
-        self.config = config
+        self.config: FleetConfig = config
         self.client = FleetClient(config)
 
         # Initialize FastMCP server
