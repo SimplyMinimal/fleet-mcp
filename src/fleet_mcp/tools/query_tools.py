@@ -93,25 +93,30 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
 
     @mcp.tool()
-    async def fleet_get_query_results(campaign_id: int) -> dict[str, Any]:
-        """Get results from a live query campaign.
-        
+    async def fleet_get_query_report(query_id: int) -> dict[str, Any]:
+        """Get the latest results from a scheduled query.
+
+        This retrieves the stored results from the last time a scheduled query ran.
+        For live/ad-hoc queries, use fleet_run_live_query instead.
+
         Args:
-            campaign_id: ID of the query campaign
-            
+            query_id: ID of the saved query
+
         Returns:
-            Dict containing query results from all targeted hosts.
+            Dict containing query results from all hosts that ran the query.
         """
         try:
             async with client:
-                response = await client.get(f"/queries/{campaign_id}/results")
+                response = await client.get(f"/queries/{query_id}")
 
                 if response.success and response.data:
-                    results = response.data.get("results", [])
+                    query_data = response.data.get("query", {})
+                    results = query_data.get("results", [])
                     return {
                         "success": True,
+                        "query_id": query_id,
+                        "query_name": query_data.get("name"),
                         "results": results,
-                        "campaign_id": campaign_id,
                         "result_count": len(results),
                         "message": f"Retrieved {len(results)} query results"
                     }
@@ -120,17 +125,17 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "success": False,
                         "message": response.message,
                         "results": [],
-                        "campaign_id": campaign_id,
+                        "query_id": query_id,
                         "result_count": 0
                     }
 
         except FleetAPIError as e:
-            logger.error(f"Failed to get query results: {e}")
+            logger.error(f"Failed to get query report: {e}")
             return {
                 "success": False,
-                "message": f"Failed to get query results: {str(e)}",
+                "message": f"Failed to get query report: {str(e)}",
                 "results": [],
-                "campaign_id": campaign_id,
+                "query_id": query_id,
                 "result_count": 0
             }
 

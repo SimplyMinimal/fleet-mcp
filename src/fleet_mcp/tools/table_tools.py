@@ -1,0 +1,543 @@
+"""Osquery table reference tools for Fleet MCP."""
+
+import logging
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+
+from ..client import FleetAPIError, FleetClient
+
+logger = logging.getLogger(__name__)
+
+
+def register_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register all table reference tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+    register_read_tools(mcp, client)
+
+
+def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register read-only table reference tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+
+    @mcp.tool()
+    async def fleet_list_osquery_tables(
+        platform: str | None = None,
+        search: str | None = None,
+        evented_only: bool = False,
+        limit: int = 100
+    ) -> dict[str, Any]:
+        """List all available osquery tables with their schemas and descriptions.
+        
+        This tool provides comprehensive information about osquery tables to help agents
+        build better queries by understanding available data sources, column schemas,
+        and platform compatibility.
+        
+        Args:
+            platform: Filter tables by platform (darwin, linux, windows, chrome)
+            search: Search tables by name or description (case-insensitive)
+            evented_only: If True, only return evented tables
+            limit: Maximum number of tables to return (default: 100)
+            
+        Returns:
+            Dict containing list of tables with detailed schema information.
+        """
+        try:
+            # Get comprehensive table information
+            tables = await _get_osquery_tables()
+            
+            # Apply filters
+            filtered_tables = []
+            for table in tables:
+                # Platform filter
+                if platform and platform.lower() not in [p.lower() for p in table.get('platforms', [])]:
+                    continue
+                    
+                # Evented filter
+                if evented_only and not table.get('evented', False):
+                    continue
+                    
+                # Search filter
+                if search:
+                    search_lower = search.lower()
+                    table_name = table.get('name', '').lower()
+                    description = table.get('description', '').lower()
+                    columns = [col.lower() for col in table.get('columns', [])]
+                    
+                    if not (search_lower in table_name or 
+                           search_lower in description or
+                           any(search_lower in col for col in columns)):
+                        continue
+                
+                filtered_tables.append(table)
+                
+                # Apply limit
+                if len(filtered_tables) >= limit:
+                    break
+            
+            return {
+                "success": True,
+                "tables": filtered_tables,
+                "count": len(filtered_tables),
+                "total_available": len(tables),
+                "filters_applied": {
+                    "platform": platform,
+                    "search": search,
+                    "evented_only": evented_only,
+                    "limit": limit
+                },
+                "message": f"Found {len(filtered_tables)} osquery tables"
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to list osquery tables: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list osquery tables: {str(e)}",
+                "tables": [],
+                "count": 0
+            }
+
+    @mcp.tool()
+    async def fleet_get_osquery_table_schema(table_name: str) -> dict[str, Any]:
+        """Get detailed schema information for a specific osquery table.
+        
+        Args:
+            table_name: Name of the osquery table to get schema for
+            
+        Returns:
+            Dict containing detailed table schema, columns, types, and usage examples.
+        """
+        try:
+            tables = await _get_osquery_tables()
+            
+            # Find the specific table
+            table_info = None
+            for table in tables:
+                if table.get('name', '').lower() == table_name.lower():
+                    table_info = table
+                    break
+            
+            if not table_info:
+                return {
+                    "success": False,
+                    "message": f"Table '{table_name}' not found",
+                    "table": None
+                }
+            
+            return {
+                "success": True,
+                "table": table_info,
+                "message": f"Retrieved schema for table '{table_name}'"
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get table schema for {table_name}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get table schema: {str(e)}",
+                "table": None
+            }
+
+    @mcp.tool()
+    async def fleet_suggest_tables_for_query(
+        query_intent: str,
+        platform: str | None = None,
+        limit: int = 10
+    ) -> dict[str, Any]:
+        """Suggest relevant osquery tables based on query intent or keywords.
+        
+        Args:
+            query_intent: Description of what you want to query (e.g., "running processes", "network connections", "installed software")
+            platform: Target platform to filter suggestions (darwin, linux, windows, chrome)
+            limit: Maximum number of suggestions to return
+            
+        Returns:
+            Dict containing suggested tables with relevance scores and descriptions.
+        """
+        try:
+            tables = await _get_osquery_tables()
+            suggestions = []
+            
+            query_keywords = query_intent.lower().split()
+            
+            for table in tables:
+                # Platform filter
+                if platform and platform.lower() not in [p.lower() for p in table.get('platforms', [])]:
+                    continue
+                
+                # Calculate relevance score
+                score = 0
+                table_name = table.get('name', '').lower()
+                description = table.get('description', '').lower()
+                columns = [col.lower() for col in table.get('columns', [])]
+                
+                # Score based on table name matches
+                for keyword in query_keywords:
+                    if keyword in table_name:
+                        score += 10
+                    if keyword in description:
+                        score += 5
+                    for col in columns:
+                        if keyword in col:
+                            score += 3
+                
+                if score > 0:
+                    suggestions.append({
+                        **table,
+                        "relevance_score": score
+                    })
+            
+            # Sort by relevance score and limit results
+            suggestions.sort(key=lambda x: x["relevance_score"], reverse=True)
+            suggestions = suggestions[:limit]
+            
+            return {
+                "success": True,
+                "suggestions": suggestions,
+                "count": len(suggestions),
+                "query_intent": query_intent,
+                "platform": platform,
+                "message": f"Found {len(suggestions)} relevant tables for '{query_intent}'"
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to suggest tables for query: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to suggest tables: {str(e)}",
+                "suggestions": [],
+                "count": 0
+            }
+
+
+async def _get_osquery_tables() -> list[dict[str, Any]]:
+    """Get comprehensive osquery table information.
+
+    Returns a comprehensive list of commonly used osquery tables with their
+    schema information, descriptions, and examples.
+
+    Returns:
+        List of table dictionaries with schema information.
+    """
+    return [
+        {
+            "name": "processes",
+            "description": "All running processes on the host system",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "pid", "name", "path", "cmdline", "state", "cwd", "root", "uid", "gid",
+                "euid", "egid", "suid", "sgid", "on_disk", "wired_size", "resident_size",
+                "total_size", "user_time", "system_time", "disk_bytes_read", "disk_bytes_written",
+                "start_time", "parent", "pgroup", "threads", "nice"
+            ],
+            "column_details": {
+                "pid": {"type": "bigint", "description": "Process (or thread) ID", "required": False},
+                "name": {"type": "text", "description": "The process name", "required": False},
+                "path": {"type": "text", "description": "Path to executed binary", "required": False},
+                "cmdline": {"type": "text", "description": "Complete argv", "required": False},
+                "state": {"type": "text", "description": "Process state", "required": False},
+                "uid": {"type": "bigint", "description": "Unsigned user ID", "required": False},
+                "gid": {"type": "bigint", "description": "Unsigned group ID", "required": False}
+            },
+            "examples": [
+                "SELECT pid, name, cmdline FROM processes WHERE name = 'chrome';",
+                "SELECT * FROM processes WHERE pid = 1234;",
+                "SELECT name, COUNT(*) as count FROM processes GROUP BY name ORDER BY count DESC;"
+            ]
+        },
+        {
+            "name": "users",
+            "description": "Local user accounts (including domain accounts that have logged on locally (Windows), or local accounts (other platforms))",
+            "platforms": ["darwin", "linux", "windows", "chrome"],
+            "evented": False,
+            "columns": [
+                "uid", "gid", "uid_signed", "gid_signed", "username", "description",
+                "directory", "shell", "uuid", "type", "is_hidden", "pid_with_namespace"
+            ],
+            "column_details": {
+                "uid": {"type": "bigint", "description": "User ID", "required": False},
+                "username": {"type": "text", "description": "Username", "required": False},
+                "description": {"type": "text", "description": "Optional user description", "required": False},
+                "directory": {"type": "text", "description": "User's home directory", "required": False},
+                "shell": {"type": "text", "description": "User's configured default shell", "required": False}
+            },
+            "examples": [
+                "SELECT uid, username, description FROM users;",
+                "SELECT * FROM users WHERE username = 'admin';",
+                "SELECT username, directory, shell FROM users WHERE uid >= 1000;"
+            ]
+        },
+        {
+            "name": "file",
+            "description": "Interactive filesystem attributes and metadata",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "path", "directory", "filename", "inode", "uid", "gid", "mode", "device",
+                "size", "block_size", "atime", "mtime", "ctime", "btime", "hard_links",
+                "symlink", "type", "attributes", "volume_serial", "file_id", "file_version",
+                "product_version", "original_filename"
+            ],
+            "column_details": {
+                "path": {"type": "text", "description": "Absolute file path", "required": True},
+                "filename": {"type": "text", "description": "Name portion of file path", "required": False},
+                "size": {"type": "bigint", "description": "Size of file in bytes", "required": False},
+                "mtime": {"type": "bigint", "description": "Last modification time", "required": False},
+                "type": {"type": "text", "description": "File type (regular, directory, etc.)", "required": False}
+            },
+            "examples": [
+                "SELECT * FROM file WHERE path = '/etc/passwd';",
+                "SELECT path, size, mtime FROM file WHERE path LIKE '/tmp/%';",
+                "SELECT filename, size FROM file WHERE directory = '/Applications';"
+            ]
+        },
+        {
+            "name": "network_interfaces",
+            "description": "Details of the system's network interfaces and their configuration",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "interface", "mac", "ip_address", "mask", "broadcast", "point_to_point",
+                "type", "mtu", "metric", "flags", "ipackets", "opackets", "ibytes",
+                "obytes", "ierrors", "oerrors", "idrops", "odrops", "collisions",
+                "last_change", "link_speed", "pci_slot", "friendly_name", "description",
+                "manufacturer", "connection_id", "connection_status", "enabled", "physical_adapter",
+                "speed", "service", "dhcp_enabled", "dhcp_lease_expires", "dhcp_lease_obtained",
+                "dhcp_server", "dns_domain", "dns_domain_suffix_search_order", "dns_host_name",
+                "dns_server_search_order"
+            ],
+            "column_details": {
+                "interface": {"type": "text", "description": "Interface name", "required": False},
+                "mac": {"type": "text", "description": "MAC address", "required": False},
+                "ip_address": {"type": "text", "description": "IP address", "required": False},
+                "type": {"type": "integer", "description": "Interface type", "required": False}
+            },
+            "examples": [
+                "SELECT interface, mac, ip_address FROM network_interfaces;",
+                "SELECT * FROM network_interfaces WHERE ip_address != '';",
+                "SELECT interface, type, enabled FROM network_interfaces WHERE enabled = 1;"
+            ]
+        },
+        {
+            "name": "listening_ports",
+            "description": "Processes with listening (bound) network sockets/ports",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "pid", "port", "protocol", "family", "address", "fd", "socket", "path", "net_namespace"
+            ],
+            "column_details": {
+                "pid": {"type": "integer", "description": "Process (or thread) ID", "required": False},
+                "port": {"type": "integer", "description": "Transport layer port", "required": False},
+                "protocol": {"type": "integer", "description": "Transport protocol (TCP/UDP)", "required": False},
+                "address": {"type": "text", "description": "Specific address for bind", "required": False}
+            },
+            "examples": [
+                "SELECT pid, port, protocol, address FROM listening_ports;",
+                "SELECT * FROM listening_ports WHERE port = 80;",
+                "SELECT p.name, lp.port, lp.address FROM listening_ports lp JOIN processes p ON lp.pid = p.pid;"
+            ]
+        },
+        {
+            "name": "system_info",
+            "description": "System information for identification",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "hostname", "uuid", "cpu_type", "cpu_subtype", "cpu_brand", "cpu_physical_cores",
+                "cpu_logical_cores", "cpu_microcode", "physical_memory", "hardware_vendor",
+                "hardware_model", "hardware_version", "hardware_serial", "computer_name",
+                "local_hostname", "cpu_sockets"
+            ],
+            "column_details": {
+                "hostname": {"type": "text", "description": "Network hostname", "required": False},
+                "cpu_brand": {"type": "text", "description": "CPU brand string", "required": False},
+                "physical_memory": {"type": "bigint", "description": "Total physical memory in bytes", "required": False},
+                "hardware_vendor": {"type": "text", "description": "Hardware vendor", "required": False}
+            },
+            "examples": [
+                "SELECT hostname, cpu_brand, physical_memory FROM system_info;",
+                "SELECT * FROM system_info;",
+                "SELECT hardware_vendor, hardware_model FROM system_info;"
+            ]
+        },
+        {
+            "name": "os_version",
+            "description": "A single row containing the operating system name and version",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "name", "version", "major", "minor", "patch", "build", "platform", "platform_like",
+                "codename", "arch", "install_date", "pid_with_namespace"
+            ],
+            "column_details": {
+                "name": {"type": "text", "description": "Distribution or product name", "required": False},
+                "version": {"type": "text", "description": "Pretty, suitable for presentation, OS version", "required": False},
+                "platform": {"type": "text", "description": "OS Platform or ID", "required": False},
+                "arch": {"type": "text", "description": "OS Architecture", "required": False}
+            },
+            "examples": [
+                "SELECT name, version, platform, arch FROM os_version;",
+                "SELECT * FROM os_version;",
+                "SELECT name, major, minor, patch FROM os_version;"
+            ]
+        },
+        {
+            "name": "installed_applications",
+            "description": "macOS applications installed in known search paths (e.g., /Applications)",
+            "platforms": ["darwin"],
+            "evented": False,
+            "columns": [
+                "name", "path", "bundle_executable", "bundle_identifier", "bundle_name",
+                "bundle_short_version", "bundle_version", "bundle_package_type", "environment",
+                "element", "compiler", "development_region", "display_name", "info_string",
+                "minimum_system_version", "category", "applescript_enabled", "copyright"
+            ],
+            "column_details": {
+                "name": {"type": "text", "description": "Name of the application", "required": False},
+                "path": {"type": "text", "description": "Path to application bundle", "required": False},
+                "bundle_identifier": {"type": "text", "description": "Application bundle identifier", "required": False},
+                "bundle_version": {"type": "text", "description": "Application bundle version", "required": False}
+            },
+            "examples": [
+                "SELECT name, bundle_identifier, bundle_version FROM installed_applications;",
+                "SELECT * FROM installed_applications WHERE name LIKE '%Chrome%';",
+                "SELECT name, path FROM installed_applications ORDER BY name;"
+            ]
+        },
+        {
+            "name": "programs",
+            "description": "Represents products as they are installed by Windows Installer. A product generally correlates to one installation package on Windows",
+            "platforms": ["windows"],
+            "evented": False,
+            "columns": [
+                "name", "version", "install_location", "install_source", "language", "publisher",
+                "uninstall_string", "install_date", "identifying_number"
+            ],
+            "column_details": {
+                "name": {"type": "text", "description": "Commonly used product name", "required": False},
+                "version": {"type": "text", "description": "Product version information", "required": False},
+                "publisher": {"type": "text", "description": "Name of the product supplier", "required": False},
+                "install_date": {"type": "text", "description": "Date that this product was installed", "required": False}
+            },
+            "examples": [
+                "SELECT name, version, publisher FROM programs;",
+                "SELECT * FROM programs WHERE name LIKE '%Microsoft%';",
+                "SELECT name, install_date FROM programs ORDER BY install_date DESC;"
+            ]
+        },
+        {
+            "name": "deb_packages",
+            "description": "The installed DEB package database",
+            "platforms": ["linux"],
+            "evented": False,
+            "columns": [
+                "name", "version", "source", "size", "arch", "revision", "status", "maintainer",
+                "section", "priority", "admindir", "pid_with_namespace"
+            ],
+            "column_details": {
+                "name": {"type": "text", "description": "Package name", "required": False},
+                "version": {"type": "text", "description": "Package version", "required": False},
+                "status": {"type": "text", "description": "Package status", "required": False},
+                "maintainer": {"type": "text", "description": "Package maintainer", "required": False}
+            },
+            "examples": [
+                "SELECT name, version, status FROM deb_packages;",
+                "SELECT * FROM deb_packages WHERE name = 'openssh-server';",
+                "SELECT name, maintainer FROM deb_packages WHERE status = 'install ok installed';"
+            ]
+        },
+        {
+            "name": "startup_items",
+            "description": "Applications and binaries set as user/login startup items",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "name", "path", "args", "type", "source", "status", "username"
+            ],
+            "column_details": {
+                "name": {"type": "text", "description": "Name of startup item", "required": False},
+                "path": {"type": "text", "description": "Path of startup executable", "required": False},
+                "type": {"type": "text", "description": "Startup Item or Login Item", "required": False},
+                "status": {"type": "text", "description": "Startup status; either enabled or disabled", "required": False}
+            },
+            "examples": [
+                "SELECT name, path, status FROM startup_items;",
+                "SELECT * FROM startup_items WHERE status = 'enabled';",
+                "SELECT name, type, username FROM startup_items;"
+            ]
+        },
+        {
+            "name": "logged_in_users",
+            "description": "Users with an active shell on the system",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "type", "user", "tty", "host", "time", "pid", "sid", "registry_hive"
+            ],
+            "column_details": {
+                "user": {"type": "text", "description": "User login name", "required": False},
+                "tty": {"type": "text", "description": "Device name", "required": False},
+                "host": {"type": "text", "description": "Remote hostname", "required": False},
+                "time": {"type": "integer", "description": "Time entry was made", "required": False}
+            },
+            "examples": [
+                "SELECT user, tty, host, time FROM logged_in_users;",
+                "SELECT * FROM logged_in_users;",
+                "SELECT user, COUNT(*) as sessions FROM logged_in_users GROUP BY user;"
+            ]
+        },
+        {
+            "name": "hash",
+            "description": "Filesystem hash data",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": False,
+            "columns": [
+                "path", "directory", "md5", "sha1", "sha256", "ssdeep", "pid_with_namespace"
+            ],
+            "column_details": {
+                "path": {"type": "text", "description": "Must provide a path or directory", "required": True},
+                "md5": {"type": "text", "description": "MD5 hash of provided filesystem data", "required": False},
+                "sha1": {"type": "text", "description": "SHA1 hash of provided filesystem data", "required": False},
+                "sha256": {"type": "text", "description": "SHA256 hash of provided filesystem data", "required": False}
+            },
+            "examples": [
+                "SELECT path, md5, sha256 FROM hash WHERE path = '/bin/ls';",
+                "SELECT * FROM hash WHERE directory = '/usr/bin';",
+                "SELECT path, sha1 FROM hash WHERE path LIKE '/etc/%';"
+            ]
+        },
+        {
+            "name": "process_events",
+            "description": "Track time/action process executions",
+            "platforms": ["darwin", "linux"],
+            "evented": True,
+            "columns": [
+                "pid", "path", "mode", "cmdline", "cmdline_size", "env", "env_count", "env_size",
+                "cwd", "auid", "uid", "euid", "gid", "egid", "owner_uid", "owner_gid", "atime",
+                "mtime", "ctime", "btime", "overflows", "parent", "time", "uptime", "eid",
+                "status", "syscall", "exit_code"
+            ],
+            "column_details": {
+                "pid": {"type": "bigint", "description": "Process (or thread) ID", "required": False},
+                "path": {"type": "text", "description": "Path of executed file", "required": False},
+                "cmdline": {"type": "text", "description": "Command line arguments", "required": False},
+                "time": {"type": "bigint", "description": "Time of execution in UNIX time", "required": False}
+            },
+            "examples": [
+                "SELECT pid, path, cmdline, time FROM process_events WHERE time > (strftime('%s', 'now') - 3600);",
+                "SELECT * FROM process_events WHERE path LIKE '%bash%';",
+                "SELECT path, COUNT(*) as executions FROM process_events GROUP BY path ORDER BY executions DESC;"
+            ]
+        }
+    ]

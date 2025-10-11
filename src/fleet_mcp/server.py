@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .client import FleetClient
 from .config import FleetConfig, get_default_config_file, load_config
-from .tools import host_tools, policy_tools, query_tools, software_tools, team_tools
+from .tools import host_tools, policy_tools, query_tools, software_tools, table_tools, team_tools
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,7 @@ class FleetMCPServer:
         query_tools.register_read_tools(self.mcp, self.client)
         policy_tools.register_read_tools(self.mcp, self.client)
         software_tools.register_tools(self.mcp, self.client)  # Software tools are all read-only
+        table_tools.register_tools(self.mcp, self.client)  # Table tools are all read-only
         team_tools.register_read_tools(self.mcp, self.client)
 
         # Only register write tools if not in readonly mode
