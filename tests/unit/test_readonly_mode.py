@@ -1,21 +1,22 @@
 """Tests for read-only mode functionality."""
 
 import pytest
-from unittest.mock import Mock, patch
-from src.fleet_mcp.config import FleetConfig
-from src.fleet_mcp.server import FleetMCPServer
+from unittest.mock import patch
+from fleet_mcp.config import FleetConfig
+from fleet_mcp.server import FleetMCPServer
 
 
+@pytest.mark.unit
 class TestReadOnlyMode:
     """Test read-only mode configuration and behavior."""
 
     def test_readonly_config_default(self):
-        """Test that readonly defaults to False."""
+        """Test that readonly defaults to True (safe by default)."""
         config = FleetConfig(
             server_url="https://test.example.com",
             api_token="test-token"
         )
-        assert config.readonly is False
+        assert config.readonly is True
 
     def test_readonly_config_explicit_true(self):
         """Test setting readonly to True explicitly."""
@@ -79,7 +80,7 @@ class TestReadOnlyMode:
             readonly=True
         )
         
-        with patch('src.fleet_mcp.server.FleetClient'):
+        with patch('fleet_mcp.server.FleetClient'):
             server = FleetMCPServer(config)
             assert "READ-ONLY MODE" in server.mcp.name
 
@@ -90,8 +91,8 @@ class TestReadOnlyMode:
             api_token="test-token",
             readonly=False
         )
-        
-        with patch('src.fleet_mcp.server.FleetClient'):
+
+        with patch('fleet_mcp.server.FleetClient'):
             server = FleetMCPServer(config)
             assert "READ-ONLY MODE" not in server.mcp.name
 
@@ -103,7 +104,7 @@ class TestReadOnlyMode:
             readonly=True
         )
 
-        with patch('src.fleet_mcp.server.FleetClient'):
+        with patch('fleet_mcp.server.FleetClient'):
             server = FleetMCPServer(config)
             assert server.mcp.instructions is not None
             assert "READ-ONLY" in server.mcp.instructions
@@ -117,7 +118,7 @@ class TestReadOnlyMode:
             readonly=False
         )
 
-        with patch('src.fleet_mcp.server.FleetClient'):
+        with patch('fleet_mcp.server.FleetClient'):
             server = FleetMCPServer(config)
             assert server.mcp.instructions is not None
             assert "READ-ONLY" not in server.mcp.instructions

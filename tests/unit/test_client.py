@@ -62,15 +62,15 @@ class TestFleetClient:
         """Test URL building for API endpoints."""
         # Test endpoint without /api prefix
         url = fleet_client._build_url("/hosts")
-        assert url == "/api/v1/fleet/hosts"
-        
+        assert url == "/api/latest/fleet/hosts"
+
         # Test endpoint with /api prefix
-        url = fleet_client._build_url("/api/v1/fleet/hosts")
-        assert url == "/api/v1/fleet/hosts"
+        url = fleet_client._build_url("/api/latest/fleet/hosts")
+        assert url == "/api/latest/fleet/hosts"
         
         # Test endpoint without leading slash
         url = fleet_client._build_url("hosts")
-        assert url == "/api/v1/fleet/hosts"
+        assert url == "/api/latest/fleet/hosts"
     
     @pytest.mark.asyncio
     async def test_health_check_success(self, fleet_client):

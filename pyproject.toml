@@ -31,6 +31,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "typing-extensions>=4.0.0",
     "click>=8.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 
@@ -128,6 +129,15 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
 asyncio_mode = "auto"
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (require Fleet server)",
+    "slow: Slow running tests",
+]
+# Filter warnings
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["src/fleet_mcp"]
