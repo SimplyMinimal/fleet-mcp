@@ -270,16 +270,18 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_delete_policy(policy_id: int) -> dict[str, Any]:
         """Delete a policy from Fleet.
-        
+
         Args:
             policy_id: ID of the policy to delete
-            
+
         Returns:
             Dict indicating success or failure of the deletion.
         """
         try:
             async with client:
-                response = await client.delete(f"/policies/{policy_id}")
+                # Fleet API uses POST to /policies/delete with JSON body containing policy IDs
+                json_data = {"ids": [policy_id]}
+                response = await client.post("/policies/delete", json_data=json_data)
 
                 return {
                     "success": response.success,

@@ -89,10 +89,10 @@ class FleetClient:
 
     def _build_url(self, endpoint: str) -> str:
         """Build full URL for API endpoint.
-        
+
         Args:
             endpoint: API endpoint path
-            
+
         Returns:
             Full URL for the endpoint
         """
@@ -100,9 +100,9 @@ class FleetClient:
         if not endpoint.startswith("/"):
             endpoint = f"/{endpoint}"
 
-        # Fleet API endpoints typically start with /api/v1/fleet/
+        # Fleet API endpoints typically start with /api/latest/fleet/
         if not endpoint.startswith("/api/"):
-            endpoint = f"/api/v1/fleet{endpoint}"
+            endpoint = f"/api/latest/fleet{endpoint}"
 
         return endpoint
 

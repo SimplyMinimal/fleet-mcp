@@ -271,18 +271,19 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         host_ids: list[int]
     ) -> dict[str, Any]:
         """Transfer hosts to a different team.
-        
+
         Args:
             team_id: Target team ID (use 0 for "No team")
             host_ids: List of host IDs to transfer
-            
+
         Returns:
             Dict indicating success or failure of the transfer.
         """
         try:
             async with client:
+                # Convert team_id=0 to null for "No team"
                 json_data = {
-                    "team_id": team_id,
+                    "team_id": None if team_id == 0 else team_id,
                     "hosts": host_ids
                 }
 
@@ -304,4 +305,108 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "team_id": team_id,
                 "host_ids": host_ids,
                 "transferred_count": 0
+            }
+
+    @mcp.tool()
+    async def fleet_query_host(host_id: int, query: str) -> dict[str, Any]:
+        """Run an ad-hoc live query against a specific host and get results.
+
+        This runs a query immediately against a single host and waits for results.
+        The query will timeout if the host doesn't respond within the configured
+        FLEET_LIVE_QUERY_REST_PERIOD (default 25 seconds).
+
+        Args:
+            host_id: ID of the host to query
+            query: SQL query string to execute
+
+        Returns:
+            Dict containing query results from the host.
+        """
+        try:
+            async with client:
+                json_data = {"query": query}
+                response = await client.post(f"/hosts/{host_id}/query", json_data=json_data)
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "host_id": host_id,
+                        "query": query,
+                        "status": response.data.get("status"),
+                        "error": response.data.get("error"),
+                        "rows": response.data.get("rows", []),
+                        "row_count": len(response.data.get("rows", [])),
+                        "message": f"Query executed on host {host_id}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "host_id": host_id,
+                        "query": query,
+                        "rows": [],
+                        "row_count": 0
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to query host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to query host: {str(e)}",
+                "host_id": host_id,
+                "query": query,
+                "rows": [],
+                "row_count": 0
+            }
+
+    @mcp.tool()
+    async def fleet_query_host_by_identifier(identifier: str, query: str) -> dict[str, Any]:
+        """Run an ad-hoc live query against a host identified by UUID/hostname/serial.
+
+        This runs a query immediately against a single host and waits for results.
+        The query will timeout if the host doesn't respond within the configured
+        FLEET_LIVE_QUERY_REST_PERIOD (default 25 seconds).
+
+        Args:
+            identifier: Host UUID, hostname, or hardware serial number
+            query: SQL query string to execute
+
+        Returns:
+            Dict containing query results from the host.
+        """
+        try:
+            async with client:
+                json_data = {"query": query}
+                response = await client.post(f"/hosts/identifier/{identifier}/query", json_data=json_data)
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "identifier": identifier,
+                        "query": query,
+                        "status": response.data.get("status"),
+                        "error": response.data.get("error"),
+                        "rows": response.data.get("rows", []),
+                        "row_count": len(response.data.get("rows", [])),
+                        "message": f"Query executed on host {identifier}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "identifier": identifier,
+                        "query": query,
+                        "rows": [],
+                        "row_count": 0
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to query host {identifier}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to query host: {str(e)}",
+                "identifier": identifier,
+                "query": query,
+                "rows": [],
+                "row_count": 0
             }

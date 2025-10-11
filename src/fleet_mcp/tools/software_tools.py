@@ -384,7 +384,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 # Get software for the host
                 host_id = target_host.get("id")
-                software_response = await self.fleet_get_host_software(host_id, query=software_name)
+                software_response = await fleet_get_host_software(host_id, query=software_name)
 
                 if software_response.get("success"):
                     matching_software = software_response.get("software", [])

@@ -93,7 +93,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
 
     @mcp.tool()
-    async def fleet_get_query_report(query_id: int) -> dict[str, Any]:
+    async def fleet_get_query_report(query_id: int, team_id: int | None = None) -> dict[str, Any]:
         """Get the latest results from a scheduled query.
 
         This retrieves the stored results from the last time a scheduled query ran.
@@ -101,24 +101,30 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Args:
             query_id: ID of the saved query
+            team_id: Optional team ID to filter results to hosts in that team
 
         Returns:
             Dict containing query results from all hosts that ran the query.
         """
         try:
             async with client:
-                response = await client.get(f"/queries/{query_id}")
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+
+                response = await client.get(f"/queries/{query_id}/report", params=params)
 
                 if response.success and response.data:
-                    query_data = response.data.get("query", {})
-                    results = query_data.get("results", [])
+                    results = response.data.get("results", [])
+                    report_clipped = response.data.get("report_clipped", False)
                     return {
                         "success": True,
                         "query_id": query_id,
-                        "query_name": query_data.get("name"),
                         "results": results,
                         "result_count": len(results),
-                        "message": f"Retrieved {len(results)} query results"
+                        "report_clipped": report_clipped,
+                        "message": f"Retrieved {len(results)} query results" +
+                                   (" (report clipped)" if report_clipped else "")
                     }
                 else:
                     return {
@@ -306,16 +312,17 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_delete_query(query_id: int) -> dict[str, Any]:
         """Delete a saved query from Fleet.
-        
+
         Args:
             query_id: ID of the query to delete
-            
+
         Returns:
             Dict indicating success or failure of the deletion.
         """
         try:
             async with client:
-                response = await client.delete(f"/queries/{query_id}")
+                # Fleet API uses /queries/id/{id} for deletion
+                response = await client.delete(f"/queries/id/{query_id}")
 
                 return {
                     "success": response.success,
@@ -339,19 +346,21 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         team_ids: list[int] | None = None
     ) -> dict[str, Any]:
         """Run a saved query against specified hosts.
-        
+
         Args:
             query_id: ID of the saved query to run
             host_ids: List of specific host IDs to target
             label_ids: List of label IDs to target hosts
             team_ids: List of team IDs to target hosts
-            
+
         Returns:
             Dict containing query execution results and campaign information.
         """
         try:
             async with client:
+                # Fleet API uses /queries/run with query_id in the body
                 json_data = {
+                    "query_id": query_id,
                     "selected": {
                         "hosts": host_ids or [],
                         "labels": label_ids or [],
@@ -359,7 +368,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     }
                 }
 
-                response = await client.post(f"/queries/{query_id}/run", json_data=json_data)
+                response = await client.post("/queries/run", json_data=json_data)
 
                 if response.success and response.data:
                     campaign = response.data.get("campaign", {})
