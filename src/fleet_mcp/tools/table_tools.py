@@ -6,8 +6,43 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from ..client import FleetAPIError, FleetClient
+from .table_discovery import get_table_cache
 
 logger = logging.getLogger(__name__)
+
+
+# Keyword aliases for better suggestion matching
+KEYWORD_ALIASES = {
+    "software": ["applications", "programs", "packages", "apps", "installed", "install"],
+    "network": ["connections", "sockets", "ports", "interfaces", "net", "tcp", "udp"],
+    "users": ["accounts", "logins", "logged", "sessions"],
+    "processes": ["running", "tasks", "services", "procs"],
+    "files": ["filesystem", "directories", "paths", "folders"],
+    "security": ["certificates", "keys", "encryption", "auth", "certs"],
+    "browser": ["chrome", "firefox", "safari", "extensions", "addons"],
+    "packages": ["rpm", "deb", "apt", "yum", "dnf"],
+}
+
+
+def _expand_keywords(query_intent: str) -> list[str]:
+    """Expand query keywords with aliases for better matching.
+
+    Args:
+        query_intent: Natural language query intent
+
+    Returns:
+        List of expanded keywords including aliases
+    """
+    keywords = query_intent.lower().split()
+    expanded = set(keywords)
+
+    for keyword in keywords:
+        for main_term, aliases in KEYWORD_ALIASES.items():
+            if keyword in aliases or keyword == main_term:
+                expanded.add(main_term)
+                expanded.update(aliases)
+
+    return list(expanded)
 
 
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -30,71 +65,116 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
     @mcp.tool()
     async def fleet_list_osquery_tables(
+        host_id: int | None = None,
         platform: str | None = None,
         search: str | None = None,
         evented_only: bool = False,
-        limit: int = 100
+        limit: int = 100,
+        include_custom: bool = True
     ) -> dict[str, Any]:
         """List all available osquery tables with their schemas and descriptions.
-        
-        This tool provides comprehensive information about osquery tables to help agents
-        build better queries by understanding available data sources, column schemas,
-        and platform compatibility.
-        
+
+        This tool dynamically discovers tables from:
+        1. Live osquery hosts (if host_id provided) - most accurate
+        2. Fleet's curated schema repository - rich metadata
+        3. Bundled schemas - offline fallback
+
+        The tool uses a hybrid approach that combines live table discovery with
+        Fleet's curated metadata to provide both accuracy and rich documentation.
+
         Args:
+            host_id: Optional host ID to discover tables from (recommended for accuracy)
             platform: Filter tables by platform (darwin, linux, windows, chrome)
             search: Search tables by name or description (case-insensitive)
             evented_only: If True, only return evented tables
             limit: Maximum number of tables to return (default: 100)
-            
+            include_custom: Include custom/extension tables (default: True)
+
         Returns:
             Dict containing list of tables with detailed schema information.
         """
         try:
-            # Get comprehensive table information
-            tables = await _get_osquery_tables()
-            
+            # Get table cache
+            cache = await get_table_cache()
+
+            # Get tables (either from host or Fleet schemas)
+            if host_id:
+                # Get host info to determine platform
+                if not platform:
+                    try:
+                        async with client:
+                            host_response = await client.get(f"/hosts/{host_id}")
+                            if host_response.success and host_response.data:
+                                platform = host_response.data.get('host', {}).get('platform', 'linux')
+                    except Exception as e:
+                        logger.warning(f"Failed to get host platform: {e}, defaulting to linux")
+                        platform = 'linux'
+
+                # Discover tables on live host
+                tables = await cache.get_tables_for_host(client, host_id, platform)
+                discovery_method = "live_host_discovery"
+            else:
+                # Use Fleet schemas only
+                if not platform:
+                    platform = 'linux'  # Default platform
+
+                tables = cache._get_fleet_schemas_by_platform(platform)
+                discovery_method = "fleet_schemas_only"
+
             # Apply filters
             filtered_tables = []
             for table in tables:
-                # Platform filter
+                # Custom table filter
+                if not include_custom and table.get('is_custom', False):
+                    continue
+
+                # Platform filter (additional filtering if specified)
                 if platform and platform.lower() not in [p.lower() for p in table.get('platforms', [])]:
                     continue
-                    
+
                 # Evented filter
                 if evented_only and not table.get('evented', False):
                     continue
-                    
+
                 # Search filter
                 if search:
                     search_lower = search.lower()
                     table_name = table.get('name', '').lower()
                     description = table.get('description', '').lower()
                     columns = [col.lower() for col in table.get('columns', [])]
-                    
-                    if not (search_lower in table_name or 
+
+                    if not (search_lower in table_name or
                            search_lower in description or
                            any(search_lower in col for col in columns)):
                         continue
-                
+
                 filtered_tables.append(table)
-                
+
                 # Apply limit
                 if len(filtered_tables) >= limit:
                     break
-            
+
+            # Count custom vs known tables
+            custom_count = len([t for t in filtered_tables if t.get('is_custom', False)])
+            known_count = len(filtered_tables) - custom_count
+
             return {
                 "success": True,
                 "tables": filtered_tables,
                 "count": len(filtered_tables),
                 "total_available": len(tables),
+                "custom_tables": custom_count,
+                "known_tables": known_count,
+                "discovery_method": discovery_method,
                 "filters_applied": {
+                    "host_id": host_id,
                     "platform": platform,
                     "search": search,
                     "evented_only": evented_only,
+                    "include_custom": include_custom,
                     "limit": limit
                 },
-                "message": f"Found {len(filtered_tables)} osquery tables"
+                "message": f"Found {len(filtered_tables)} osquery tables ({known_count} known, {custom_count} custom)"
             }
 
         except Exception as e:
@@ -107,32 +187,60 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
-    async def fleet_get_osquery_table_schema(table_name: str) -> dict[str, Any]:
+    async def fleet_get_osquery_table_schema(
+        table_name: str,
+        host_id: int | None = None
+    ) -> dict[str, Any]:
         """Get detailed schema information for a specific osquery table.
-        
+
         Args:
             table_name: Name of the osquery table to get schema for
-            
+            host_id: Optional host ID to get live schema from (recommended)
+
         Returns:
             Dict containing detailed table schema, columns, types, and usage examples.
         """
         try:
-            tables = await _get_osquery_tables()
-            
+            # Get table cache
+            cache = await get_table_cache()
+
+            # Get tables
+            if host_id:
+                # Get host platform
+                platform = 'linux'  # Default
+                try:
+                    async with client:
+                        host_response = await client.get(f"/hosts/{host_id}")
+                        if host_response.success and host_response.data:
+                            platform = host_response.data.get('host', {}).get('platform', 'linux')
+                except Exception as e:
+                    logger.warning(f"Failed to get host platform: {e}")
+
+                tables = await cache.get_tables_for_host(client, host_id, platform)
+            else:
+                # Use all Fleet schemas
+                tables = []
+                for name, schema in cache.fleet_schemas.items():
+                    tables.append({
+                        'name': name,
+                        **schema,
+                        'is_custom': False
+                    })
+
             # Find the specific table
             table_info = None
             for table in tables:
                 if table.get('name', '').lower() == table_name.lower():
                     table_info = table
                     break
-            
+
             if not table_info:
                 return {
                     "success": False,
-                    "message": f"Table '{table_name}' not found",
+                    "message": f"Table '{table_name}' not found. Try using fleet_list_osquery_tables to see available tables.",
                     "table": None
                 }
-            
+
             return {
                 "success": True,
                 "table": table_info,
@@ -150,37 +258,87 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_suggest_tables_for_query(
         query_intent: str,
+        host_id: int | None = None,
         platform: str | None = None,
         limit: int = 10
     ) -> dict[str, Any]:
         """Suggest relevant osquery tables based on query intent or keywords.
-        
+
+        This tool helps you find the right osquery tables for your query by:
+        1. Analyzing your intent (e.g., "find installed software", "check network connections")
+        2. Matching keywords against table names, descriptions, and columns
+        3. Providing relevance scores to rank suggestions
+        4. Including usage examples and metadata
+
+        BEST PRACTICES:
+        - Describe what you want to find, not how to find it
+        - Use natural language (e.g., "running processes" not "SELECT * FROM processes")
+        - Specify host_id for most accurate results (discovers custom tables)
+        - Specify platform if known (darwin/linux/windows) for better suggestions
+
+        EXAMPLES:
+        - "find all installed Python packages" → suggests rpm_packages, deb_packages, programs
+        - "check which processes are listening on ports" → suggests processes, listening_ports
+        - "list browser extensions" → suggests chrome_extensions, firefox_addons
+
         Args:
-            query_intent: Description of what you want to query (e.g., "running processes", "network connections", "installed software")
-            platform: Target platform to filter suggestions (darwin, linux, windows, chrome)
-            limit: Maximum number of suggestions to return
-            
+            query_intent: Natural language description of what you want to query
+            host_id: Optional host ID to discover tables from (recommended)
+            platform: Target platform (darwin, linux, windows, chrome) - filters suggestions
+            limit: Maximum number of suggestions (default: 10)
+
         Returns:
-            Dict containing suggested tables with relevance scores and descriptions.
+            Ranked list of relevant tables with relevance scores, schemas, and examples.
         """
         try:
-            tables = await _get_osquery_tables()
+            # Get table cache
+            cache = await get_table_cache()
+
+            # Get tables
+            if host_id:
+                # Get host platform
+                if not platform:
+                    try:
+                        async with client:
+                            host_response = await client.get(f"/hosts/{host_id}")
+                            if host_response.success and host_response.data:
+                                platform = host_response.data.get('host', {}).get('platform', 'linux')
+                    except Exception as e:
+                        logger.warning(f"Failed to get host platform: {e}")
+                        platform = 'linux'
+
+                tables = await cache.get_tables_for_host(client, host_id, platform)
+            else:
+                # Use Fleet schemas
+                if platform:
+                    tables = cache._get_fleet_schemas_by_platform(platform)
+                else:
+                    # All tables
+                    tables = []
+                    for name, schema in cache.fleet_schemas.items():
+                        tables.append({
+                            'name': name,
+                            **schema,
+                            'is_custom': False
+                        })
+
+            # Expand keywords with synonyms
+            query_keywords = _expand_keywords(query_intent)
+
             suggestions = []
-            
-            query_keywords = query_intent.lower().split()
-            
+
             for table in tables:
-                # Platform filter
+                # Platform filter (if specified and not already filtered)
                 if platform and platform.lower() not in [p.lower() for p in table.get('platforms', [])]:
                     continue
-                
+
                 # Calculate relevance score
                 score = 0
                 table_name = table.get('name', '').lower()
                 description = table.get('description', '').lower()
                 columns = [col.lower() for col in table.get('columns', [])]
-                
-                # Score based on table name matches
+
+                # Score based on keyword matches
                 for keyword in query_keywords:
                     if keyword in table_name:
                         score += 10
@@ -189,23 +347,24 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     for col in columns:
                         if keyword in col:
                             score += 3
-                
+
                 if score > 0:
                     suggestions.append({
                         **table,
                         "relevance_score": score
                     })
-            
+
             # Sort by relevance score and limit results
             suggestions.sort(key=lambda x: x["relevance_score"], reverse=True)
             suggestions = suggestions[:limit]
-            
+
             return {
                 "success": True,
                 "suggestions": suggestions,
                 "count": len(suggestions),
                 "query_intent": query_intent,
                 "platform": platform,
+                "host_id": host_id,
                 "message": f"Found {len(suggestions)} relevant tables for '{query_intent}'"
             }
 
@@ -219,7 +378,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
 
-async def _get_osquery_tables() -> list[dict[str, Any]]:
+# Note: The old _get_osquery_tables() function with hardcoded tables has been removed.
+# Tables are now dynamically discovered using the TableSchemaCache in table_discovery.py
+# This provides:
+# - Live discovery from osquery_registry table
+# - Rich metadata from Fleet's GitHub schema repository
+# - Support for custom tables and extensions
+# - Platform-aware filtering
+# - Smart caching with 1-hour TTL
+
+async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
     """Get comprehensive osquery table information.
 
     Returns a comprehensive list of commonly used osquery tables with their
