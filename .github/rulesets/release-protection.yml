@@ -1,0 +1,19 @@
+name: "Release Protection"
+target: "refs/tags/v*"
+enforcement: "active"
+
+rules:
+  # Only allow specific users to create releases
+  - type: "restrict_pushes"
+    parameters:
+      restrict_pushes_create_matching: true
+      
+  # Require all checks to pass
+  - type: "required_status_checks"
+    parameters:
+      strict_branch_policy: true
+      required_status_checks:
+        - "unit-tests"
+        - "lint-and-format"
+        - "type-check"
+        - "security-scan"

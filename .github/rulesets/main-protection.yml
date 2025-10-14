@@ -1,0 +1,32 @@
+name: "Main Branch Protection"
+target: "main"
+enforcement: "active"
+
+rules:
+  # Require pull requests
+  - type: "pull_request"
+    parameters:
+      dismiss_stale_reviews: true
+      require_code_owner_reviews: false
+      required_approving_review_count: 1
+      require_last_push_approval: false
+      
+  # Require status checks
+  - type: "required_status_checks"
+    parameters:
+      strict_branch_policy: true
+      required_status_checks:
+        - "unit-tests"
+        - "lint-and-format"
+        - "type-check"
+        
+  # Prevent force pushes
+  - type: "non_fast_forward"
+  
+  # Require linear history
+  - type: "required_linear_history"
+  
+  # Restrict pushes to main
+  - type: "restrict_pushes"
+    parameters:
+      restricted_pushes: true
