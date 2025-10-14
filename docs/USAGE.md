@@ -155,6 +155,11 @@ Once connected, you can use these tools through Claude or other MCP clients:
 - `fleet_get_user` - Get user details
 - `fleet_list_activities` - Get audit logs
 
+### Osquery Table Reference
+- `fleet_list_osquery_tables` - List all available osquery tables with filtering
+- `fleet_get_osquery_table_schema` - Get detailed schema for a specific table
+- `fleet_suggest_tables_for_query` - Get table suggestions based on query intent
+
 ### System Tools
 - `fleet_health_check` - Test server connectivity
 
@@ -190,6 +195,63 @@ Once connected, you can use these tools through Claude or other MCP clients:
 "Show me which hosts are failing the encryption policy"
 "List all critical policies and their compliance status"
 "Update the password policy to require 12 characters"
+```
+
+## Example: Using Osquery Table Reference Tools
+
+### Finding Tables for a Specific Use Case
+
+**User**: "I want to query information about running processes and their network connections"
+
+**Agent**: I'll help you find the right osquery tables for that. Let me search for relevant tables.
+
+```python
+fleet_suggest_tables_for_query(
+    query_intent="running processes and network connections",
+    platform="linux",
+    limit=5
+)
+```
+
+This returns suggestions like:
+- `processes` - All running processes on the host system
+- `listening_ports` - Processes with listening network sockets/ports
+- `process_open_sockets` - Processes which have open network sockets
+
+### Getting Detailed Schema Information
+
+**User**: "What columns are available in the processes table?"
+
+**Agent**: Let me get the detailed schema for the processes table.
+
+```python
+fleet_get_osquery_table_schema("processes")
+```
+
+This returns detailed information including:
+- Column names and types (pid, name, path, cmdline, etc.)
+- Column descriptions
+- Example queries
+- Supported platforms
+
+### Building a Query with Table Information
+
+**User**: "Now help me write a query to find Chrome processes and their listening ports"
+
+**Agent**: Based on the table schemas, here's a query that joins the processes and listening_ports tables:
+
+```sql
+SELECT
+    p.pid,
+    p.name,
+    p.cmdline,
+    lp.port,
+    lp.address,
+    lp.protocol
+FROM processes p
+JOIN listening_ports lp ON p.pid = lp.pid
+WHERE p.name LIKE '%chrome%'
+   OR p.cmdline LIKE '%chrome%';
 ```
 
 ## Troubleshooting

@@ -81,6 +81,48 @@ Transfer hosts to a different team.
 - `team_id` (int): Target team ID (use 0 for "No team")
 - `host_ids` (List[int]): List of host IDs to transfer
 
+#### `fleet_query_host`
+Run an ad-hoc live query against a specific host and get results immediately.
+
+**Parameters:**
+- `host_id` (int): ID of the host to query
+- `query` (str): SQL query string to execute
+
+**Returns:**
+```json
+{
+  "success": true,
+  "host_id": 123,
+  "query": "SELECT * FROM processes;",
+  "status": "online",
+  "error": null,
+  "rows": [...],
+  "row_count": 45
+}
+```
+
+**Note:** Query will timeout if the host doesn't respond within FLEET_LIVE_QUERY_REST_PERIOD (default 25 seconds).
+
+#### `fleet_query_host_by_identifier`
+Run an ad-hoc live query against a host identified by UUID, hostname, or serial number.
+
+**Parameters:**
+- `identifier` (str): Host UUID, hostname, or hardware serial number
+- `query` (str): SQL query string to execute
+
+**Returns:**
+```json
+{
+  "success": true,
+  "identifier": "my-laptop",
+  "query": "SELECT * FROM system_info;",
+  "status": "online",
+  "error": null,
+  "rows": [...],
+  "row_count": 1
+}
+```
+
 ### Query Management Tools
 
 #### `fleet_list_queries`
@@ -121,11 +163,25 @@ Execute a live query against specified hosts.
 - `label_ids` (List[int], optional): List of label IDs to target hosts
 - `team_ids` (List[int], optional): List of team IDs to target hosts
 
-#### `fleet_get_query_results`
-Get results from a live query campaign.
+#### `fleet_get_query_report`
+Get the latest results from a scheduled query.
 
 **Parameters:**
-- `campaign_id` (int): ID of the query campaign
+- `query_id` (int): ID of the saved query
+- `team_id` (int, optional): Filter results to hosts in a specific team
+
+**Returns:**
+```json
+{
+  "success": true,
+  "query_id": 31,
+  "results": [...],
+  "result_count": 150,
+  "report_clipped": false
+}
+```
+
+**Note:** This retrieves stored results from scheduled queries. For live/ad-hoc queries, use `fleet_run_live_query` or `fleet_query_host`.
 
 #### `fleet_run_saved_query`
 Run a saved query against specified hosts.
@@ -318,6 +374,54 @@ Fleet MCP respects Fleet API rate limits:
 - Automatic retry with exponential backoff
 - Configurable timeout and retry settings
 - Graceful handling of rate limit responses
+
+## Osquery Table Reference Tools
+
+### `fleet_list_osquery_tables`
+List all available osquery tables with their schemas and descriptions.
+
+**Parameters:**
+- `platform` (str, optional): Filter tables by platform (darwin, linux, windows, chrome)
+- `search` (str, optional): Search tables by name or description (case-insensitive)
+- `evented_only` (bool, default: false): If True, only return evented tables
+- `limit` (int, default: 100): Maximum number of tables to return
+
+**Example:**
+```python
+fleet_list_osquery_tables(
+    platform="darwin",
+    search="process",
+    limit=50
+)
+```
+
+### `fleet_get_osquery_table_schema`
+Get detailed schema information for a specific osquery table.
+
+**Parameters:**
+- `table_name` (str): Name of the osquery table to get schema for
+
+**Example:**
+```python
+fleet_get_osquery_table_schema("processes")
+```
+
+### `fleet_suggest_tables_for_query`
+Suggest relevant osquery tables based on query intent or keywords.
+
+**Parameters:**
+- `query_intent` (str): Description of what you want to query
+- `platform` (str, optional): Target platform to filter suggestions
+- `limit` (int, default: 10): Maximum number of suggestions to return
+
+**Example:**
+```python
+fleet_suggest_tables_for_query(
+    query_intent="running processes and network connections",
+    platform="linux",
+    limit=5
+)
+```
 
 ## Best Practices
 
