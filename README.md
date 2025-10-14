@@ -61,25 +61,342 @@ fleet-mcp test
 fleet-mcp run
 ```
 
-### 4. Use with Claude Desktop
+### 4. Use with MCP Clients
 
-Add to your Claude Desktop MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+See the [MCP Client Configuration](#mcp-client-configuration) section below for detailed setup instructions for various clients.
+
+## MCP Client Configuration
+
+Fleet MCP can be integrated with various MCP-compatible clients. Below are configuration examples for popular clients.
+
+### Prerequisites
+
+Before configuring any MCP client, ensure you have:
+
+1. **Installed `uv`** (recommended) or `pip`:
+   ```bash
+   # Install uv (recommended)
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Or use pip
+   pip install fleet-mcp
+   ```
+
+2. **Fleet API Token**: Generate an API token from your Fleet instance:
+   - Log into Fleet UI
+   - Navigate to: My account → Get API token
+   - Copy the token for use in configuration
+
+3. **Fleet Server URL**: Your Fleet instance URL (e.g., `https://fleet.example.com`)
+
+<details>
+<summary><b>Install in Claude Desktop</b></summary>
+
+#### Configuration File Location
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+#### Configuration
 
 ```json
 {
   "mcpServers": {
     "fleet": {
-      "command": "fleet-mcp",
-      "args": ["run"],
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
       "env": {
         "FLEET_SERVER_URL": "https://your-fleet-instance.com",
         "FLEET_API_TOKEN": "your-api-token",
-        "FLEET_READONLY": "true"
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
       }
     }
   }
 }
 ```
+
+> **Note:** Replace `uvx` with `fleet-mcp` if you've installed the package globally. For enhanced security, use `--config` flag to reference a TOML file instead of embedding tokens (see [Security Best Practices](#security-best-practices)).
+
+</details>
+
+<details>
+<summary><b>Install in Cursor</b></summary>
+
+Go to: `Settings` → `Cursor Settings` → `MCP` → `Add new global MCP server`
+
+Install globally in `~/.cursor/mcp.json` or per-project in `.cursor/mcp.json`. See [Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol) for more info.
+
+```json
+{
+  "mcpServers": {
+    "fleet": {
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in Cline (VS Code Extension)</b></summary>
+
+**Config Location:** `~/.cline/mcp_settings.json` (macOS/Linux) or `%USERPROFILE%\.cline\mcp_settings.json` (Windows)
+
+Alternatively: VS Code Settings → Search "Cline: MCP Settings" → Edit JSON
+
+```json
+{
+  "mcpServers": {
+    "fleet": {
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in Continue (VS Code Extension)</b></summary>
+
+**Config Location:** `~/.continue/config.json`
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "fleet",
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in Zed Editor</b></summary>
+
+**Config Location:** `~/.config/zed/settings.json` (macOS/Linux) or `%APPDATA%\Zed\settings.json` (Windows)
+
+```json
+{
+  "context_servers": {
+    "fleet": {
+      "command": {
+        "path": "uvx",
+        "args": ["fleet-mcp", "run"]
+      },
+      "settings": {
+        "env": {
+          "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+          "FLEET_API_TOKEN": "your-api-token",
+          "FLEET_READONLY": "true",
+          "FLEET_ALLOW_SELECT_QUERIES": "true"
+        }
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in Windsurf</b></summary>
+
+See [Windsurf MCP docs](https://docs.windsurf.com/windsurf/cascade/mcp) for more info.
+
+```json
+{
+  "mcpServers": {
+    "fleet": {
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in VS Code</b></summary>
+
+See [VS Code MCP docs](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) for more info.
+
+```json
+"mcp": {
+  "servers": {
+    "fleet": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in Sourcegraph Cody</b></summary>
+
+**Config Location:** `~/Library/Application Support/Cody/mcp_settings.json` (macOS), `%APPDATA%\Cody\mcp_settings.json` (Windows), or `~/.config/Cody/mcp_settings.json` (Linux)
+
+```json
+{
+  "mcpServers": {
+    "fleet": {
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in Augment Code</b></summary>
+
+**Via UI:** Hamburger menu → Settings → Tools → + Add MCP → Enter `uvx fleet-mcp run` → Name: "Fleet" → Add
+
+**Manual Config:** Settings → Advanced → Edit settings.json
+
+```json
+"augment.advanced": {
+  "mcpServers": [
+    {
+      "name": "fleet",
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary><b>Install in LM Studio</b></summary>
+
+Navigate to `Program` → `Install` → `Edit mcp.json`. See [LM Studio MCP Support](https://lmstudio.ai/blog/lmstudio-v0.3.17).
+
+```json
+{
+  "mcpServers": {
+    "fleet": {
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Generic MCP Client Configuration</b></summary>
+
+For other MCP-compatible clients, use this general pattern:
+
+```json
+{
+  "mcpServers": {
+    "fleet": {
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+### Configuration Options Reference
+
+| Environment Variable | Description | Default | Required |
+|---------------------|-------------|---------|----------|
+| `FLEET_SERVER_URL` | Fleet server URL | - | ✅ |
+| `FLEET_API_TOKEN` | Fleet API token | - | ✅ |
+| `FLEET_READONLY` | Enable read-only mode | `true` | ❌ |
+| `FLEET_ALLOW_SELECT_QUERIES` | Allow SELECT queries in read-only mode | `false` | ❌ |
+| `FLEET_VERIFY_SSL` | Verify SSL certificates | `true` | ❌ |
+| `FLEET_TIMEOUT` | Request timeout (seconds) | `30` | ❌ |
+| `FLEET_MAX_RETRIES` | Maximum request retries | `3` | ❌ |
+
+> **Note:** All clients above use the same environment variables. Replace `uvx` with `fleet-mcp` if installed globally.
+
+### Security Best Practices
+
+1. **Use Config Files**: Store tokens in TOML files: `"args": ["fleet-mcp", "--config", "~/.config/fleet-mcp.toml", "run"]`
+2. **File Permissions**: `chmod 600 ~/.config/fleet-mcp.toml`
+3. **Read-Only Mode**: Start with `FLEET_READONLY=true` (default)
+4. **Token Rotation**: Regularly rotate Fleet API tokens
+5. **Environment-Specific Configs**: Use separate configs for dev/prod
+
+
 
 ## Available Tools
 
@@ -146,50 +463,30 @@ Fleet MCP provides 40+ tools organized into the following categories:
 
 ## Configuration
 
-Fleet MCP can be configured via environment variables, configuration file, or command-line arguments.
+Fleet MCP supports three configuration methods (in order of precedence):
+
+1. **Command-line arguments** (highest priority)
+2. **Environment variables** (with `FLEET_` prefix)
+3. **Configuration file** (recommended for security)
 
 ### Configuration File (Recommended)
 
-Create a `fleet-mcp.toml` file:
+Create `fleet-mcp.toml`:
 
 ```toml
 [fleet]
-# Fleet server URL (required)
-server_url = "https://your-fleet-instance.com"
-
-# Fleet API token (required)
-api_token = "your-api-token"
-
-# Verify SSL certificates (default: true)
-verify_ssl = true
-
-# Request timeout in seconds (default: 30)
-timeout = 30
-
-# Maximum retries for failed requests (default: 3)
-max_retries = 3
-
-# Read-only mode - disables write operations (default: true)
-readonly = true
-
-# Allow SELECT-only queries in read-only mode (default: false)
-# When true, enables fleet_run_live_query, fleet_query_host, etc. with validation
-allow_select_queries = false
+server_url = "https://your-fleet-instance.com"  # Required
+api_token = "your-api-token"                     # Required
+verify_ssl = true                                # Default: true
+timeout = 30                                     # Default: 30 seconds
+max_retries = 3                                  # Default: 3
+readonly = true                                  # Default: true
+allow_select_queries = false                     # Default: false
 ```
 
 ### Environment Variables
 
-All configuration options can be set via environment variables with the `FLEET_` prefix:
-
-- `FLEET_SERVER_URL` - Fleet server URL (required)
-- `FLEET_API_TOKEN` - API authentication token (required)
-- `FLEET_VERIFY_SSL` - Verify SSL certificates (default: `true`)
-- `FLEET_TIMEOUT` - Request timeout in seconds (default: `30`)
-- `FLEET_MAX_RETRIES` - Maximum retries for failed requests (default: `3`)
-- `FLEET_READONLY` - Enable read-only mode (default: `true`)
-- `FLEET_ALLOW_SELECT_QUERIES` - Allow SELECT-only queries in read-only mode (default: `false`)
-
-Environment variables override configuration file settings.
+See [Configuration Options Reference](#configuration-options-reference) for all available variables. Environment variables use the `FLEET_` prefix and override config file settings.
 
 ### Command-Line Arguments
 
@@ -197,167 +494,50 @@ Environment variables override configuration file settings.
 fleet-mcp --server-url https://fleet.example.com --api-token YOUR_TOKEN run
 ```
 
-Available options:
-- `--config, -c` - Path to configuration file
-- `--server-url` - Fleet server URL
-- `--api-token` - Fleet API token
-- `--readonly` - Enable read-only mode
-- `--verbose, -v` - Enable verbose logging
+Options: `--config`, `--server-url`, `--api-token`, `--readonly`, `--verbose`
 
 ## Read-Only Mode
 
-Fleet MCP runs in **read-only mode by default** to provide a safe way to explore and monitor your Fleet instance without risk of making changes.
+Fleet MCP runs in **read-only mode by default** for safe exploration without risk of changes.
 
 ### Three Operational Modes
 
-#### 1. Strict Read-Only Mode (Default)
-**Configuration:** `readonly=true`, `allow_select_queries=false`
+| Mode | Config | Capabilities | Best For |
+|------|--------|--------------|----------|
+| **Strict Read-Only** (Default) | `readonly=true`<br>`allow_select_queries=false` | ✅ View all resources<br>❌ No query execution<br>❌ No modifications | Safe exploration |
+| **Read-Only + SELECT** | `readonly=true`<br>`allow_select_queries=true` | ✅ View all resources<br>✅ Run SELECT queries (validated)<br>❌ No modifications | Active monitoring |
+| **Full Write** | `readonly=false` | ✅ All operations<br>⚠️ AI can modify Fleet | Full management |
 
-- ✅ View hosts, queries, policies, software, teams, users
-- ✅ Get query reports from scheduled queries
-- ✅ List vulnerabilities and software inventory
-- ✅ View activity logs
-- ❌ No query execution (even SELECT queries)
-- ❌ No create, update, or delete operations
-
-**Best for:** Safe exploration and monitoring without any risk
-
-#### 2. Read-Only with SELECT Queries
-**Configuration:** `readonly=true`, `allow_select_queries=true`
-
-- ✅ All read-only mode features
-- ✅ Run SELECT-only queries against hosts (`fleet_query_host`, `fleet_query_host_by_identifier`)
-- ✅ Execute live SELECT queries (`fleet_run_live_query`)
-- ✅ Run saved queries with SELECT validation (`fleet_run_saved_query`)
-- ✅ All queries are validated to ensure they're SELECT-only
-- ❌ No INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, or other data modification
-- ❌ No create, update, or delete operations on Fleet resources
-
-**Best for:** Active monitoring and investigation while maintaining safety
-
-**Query Validation:** All queries are automatically validated before execution. Queries containing data modification keywords (INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, REPLACE, MERGE) are rejected with a clear error message.
-
-#### 3. Full Write Mode
-**Configuration:** `readonly=false`
-
-- ✅ All read operations
-- ✅ All query execution (no validation)
-- ✅ Create, update, and delete queries
-- ✅ Create, update, and delete policies
-- ✅ Create teams
-- ✅ Delete and transfer hosts
-
-**Best for:** Full Fleet management with AI assistance
-
-⚠️ **Use with caution** - AI can make changes to your Fleet instance
+**Query Validation:** In SELECT mode, queries are validated to block INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, REPLACE, MERGE.
 
 ### Configuration Examples
 
-#### Example 1: Strict Read-Only (Default)
 ```toml
+# Strict Read-Only (Default)
 [fleet]
-server_url = "https://fleet.example.com"
-api_token = "your-token"
 readonly = true
 allow_select_queries = false
-```
 
-#### Example 2: Read-Only with SELECT Queries
-```toml
+# Read-Only with SELECT Queries
 [fleet]
-server_url = "https://fleet.example.com"
-api_token = "your-token"
 readonly = true
 allow_select_queries = true
-```
 
-#### Example 3: Full Write Access
-```toml
+# Full Write Access (⚠️ Use with caution)
 [fleet]
-server_url = "https://fleet.example.com"
-api_token = "your-token"
 readonly = false
-```
-
-### Claude Desktop Configuration Examples
-
-#### Read-Only with SELECT Queries
-```json
-{
-  "mcpServers": {
-    "fleet": {
-      "command": "fleet-mcp",
-      "args": ["run"],
-      "env": {
-        "FLEET_SERVER_URL": "https://fleet.example.com",
-        "FLEET_API_TOKEN": "your-token",
-        "FLEET_READONLY": "true",
-        "FLEET_ALLOW_SELECT_QUERIES": "true"
-      }
-    }
-  }
-}
-```
-
-#### Full Write Access
-```json
-{
-  "mcpServers": {
-    "fleet": {
-      "command": "fleet-mcp",
-      "args": ["run"],
-      "env": {
-        "FLEET_SERVER_URL": "https://fleet.example.com",
-        "FLEET_API_TOKEN": "your-token",
-        "FLEET_READONLY": "false"
-      }
-    }
-  }
-}
 ```
 
 ## CLI Commands
 
-Fleet MCP provides several CLI commands for managing the server:
+| Command | Description | Example |
+|---------|-------------|---------|
+| `run` | Start MCP server | `fleet-mcp run` |
+| `test` | Test Fleet connection | `fleet-mcp test` |
+| `init-config` | Create config template | `fleet-mcp init-config` |
+| `version` | Show version | `fleet-mcp version` |
 
-### `fleet-mcp run`
-Start the MCP server.
-
-```bash
-fleet-mcp run
-fleet-mcp --config custom-config.toml run
-fleet-mcp --verbose run
-```
-
-### `fleet-mcp test`
-Test connection to Fleet server.
-
-```bash
-fleet-mcp test
-fleet-mcp --config custom-config.toml test
-```
-
-### `fleet-mcp init-config`
-Create a configuration file template.
-
-```bash
-fleet-mcp init-config
-fleet-mcp init-config --output my-config.toml
-```
-
-### `fleet-mcp version`
-Show version information.
-
-```bash
-fleet-mcp version
-```
-
-### Global Options
-- `--config, -c PATH` - Path to configuration file
-- `--verbose, -v` - Enable verbose logging
-- `--server-url URL` - Fleet server URL (overrides config)
-- `--api-token TOKEN` - Fleet API token (overrides config)
-- `--readonly` - Enable read-only mode (overrides config)
+**Global Options:** `--config`, `--verbose`, `--server-url`, `--api-token`, `--readonly`
 
 ## Usage Examples
 
@@ -390,163 +570,96 @@ fleet-mcp version
 
 ## Development
 
-This project uses [uv](https://docs.astral.sh/uv/) for dependency management and development workflows.
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 
-### Setup Development Environment
+### Setup
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/SimplyMinimal/fleet-mcp.git
-   cd fleet-mcp
-   ```
+```bash
+git clone https://github.com/SimplyMinimal/fleet-mcp.git
+cd fleet-mcp
+uv sync --dev
+```
 
-2. **Install dependencies** (uv will automatically create a virtual environment):
-   ```bash
-   uv sync --dev
-   ```
+### Common Tasks
 
-3. **Run tests**:
-   ```bash
-   uv run pytest
-   uv run pytest -v  # Verbose output
-   uv run pytest tests/unit  # Unit tests only
-   uv run pytest tests/integration  # Integration tests only
-   ```
-
-4. **Format code**:
-   ```bash
-   uv run black src tests
-   uv run isort src tests
-   ```
-
-5. **Type checking**:
-   ```bash
-   uv run mypy src
-   ```
-
-6. **Linting**:
-   ```bash
-   uv run ruff check src tests
-   uv run ruff check --fix src tests  # Auto-fix issues
-   ```
-
-7. **Run the CLI**:
-   ```bash
-   uv run fleet-mcp run
-   uv run fleet-mcp test
-   ```
-
-### Adding Dependencies
-
-- **Runtime dependencies**: `uv add package-name`
-- **Development dependencies**: `uv add --group dev package-name`
+| Task | Command |
+|------|---------|
+| Run tests | `uv run pytest` |
+| Format code | `uv run black src tests && uv run isort src tests` |
+| Type check | `uv run mypy src` |
+| Lint | `uv run ruff check src tests` |
+| Add dependency | `uv add package-name` |
+| Add dev dependency | `uv add --group dev package-name` |
 
 ### Project Structure
 
 ```
-fleet-mcp/
-├── src/fleet_mcp/
-│   ├── __init__.py
-│   ├── cli.py              # Command-line interface
-│   ├── client.py           # Fleet API client
-│   ├── config.py           # Configuration management
-│   ├── server.py           # MCP server implementation
-│   ├── tools/              # MCP tool implementations
-│   │   ├── host_tools.py
-│   │   ├── query_tools.py
-│   │   ├── query_tools_readonly.py
-│   │   ├── policy_tools.py
-│   │   ├── software_tools.py
-│   │   ├── team_tools.py
-│   │   ├── table_tools.py
-│   │   └── table_discovery.py
-│   └── utils/
-│       └── sql_validator.py
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── pyproject.toml
-└── README.md
+src/fleet_mcp/
+├── cli.py              # Command-line interface
+├── client.py           # Fleet API client
+├── config.py           # Configuration management
+├── server.py           # MCP server implementation
+├── tools/              # MCP tool implementations
+└── utils/              # Utilities (SQL validator, etc.)
 ```
 
 ## Troubleshooting
 
-### Connection Issues
+<details>
+<summary><b>Server Not Appearing in Client</b></summary>
 
-**Problem:** "Failed to connect to Fleet server"
+1. Validate JSON syntax in config file
+2. Restart the MCP client
+3. Check client logs for errors
+4. Verify `uvx` or `fleet-mcp` is in PATH: `which uvx`
 
-**Solutions:**
-- Verify `FLEET_SERVER_URL` is correct and accessible
-- Check that `FLEET_API_TOKEN` is valid
-- If using self-signed certificates, set `verify_ssl = false` in config
-- Test connection with `fleet-mcp test`
+</details>
 
-### Authentication Issues
+<details>
+<summary><b>Connection Errors</b></summary>
 
-**Problem:** "Authentication failed" or "401 Unauthorized"
+1. Test manually: `uvx fleet-mcp test`
+2. Verify `FLEET_SERVER_URL` is accessible
+3. Check `FLEET_API_TOKEN` is valid
+4. For self-signed certs: `FLEET_VERIFY_SSL=false`
 
-**Solutions:**
-- Verify your API token is correct
-- Check token hasn't expired
-- Ensure token has appropriate permissions
-- Generate a new token from Fleet UI: My account → Get API token
+</details>
 
-### Query Validation Errors
+<details>
+<summary><b>Authentication Failed (401)</b></summary>
 
-**Problem:** "Query validation failed" when running queries
+1. Verify API token is correct
+2. Check token hasn't expired
+3. Ensure token has appropriate permissions
+4. Generate new token: Fleet UI → My account → Get API token
 
-**Solutions:**
-- Ensure `allow_select_queries = true` in configuration
-- Verify query is SELECT-only (no INSERT, UPDATE, DELETE, etc.)
-- Check query syntax is valid osquery SQL
+</details>
 
-### Tool Not Available
+<details>
+<summary><b>Query Validation Failed</b></summary>
 
-**Problem:** Tool like `fleet_create_query` not available
+1. Set `FLEET_ALLOW_SELECT_QUERIES=true`
+2. Ensure query is SELECT-only (no INSERT, UPDATE, DELETE, etc.)
+3. Verify osquery SQL syntax is valid
 
-**Solutions:**
-- Check if read-only mode is enabled (`readonly = true`)
-- Write operations require `readonly = false`
-- Some tools require `allow_select_queries = true`
+</details>
+
+<details>
+<summary><b>Tool Not Available</b></summary>
+
+- Write operations require `FLEET_READONLY=false`
+- Query execution requires `FLEET_ALLOW_SELECT_QUERIES=true`
+- Check tool availability in current mode
+
+</details>
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-### How to Contribute
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`uv run pytest`)
-5. Format code (`uv run black src tests && uv run isort src tests`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+Contributions welcome! Fork → Create branch → Make changes → Run tests → Format code → Submit PR
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Fleet Device Management](https://fleetdm.com) - The open-source device management platform
-- [Model Context Protocol](https://modelcontextprotocol.io) - The protocol enabling AI-application integration
-- [osquery](https://osquery.io) - The SQL-powered operating system instrumentation framework
-
-## Support & Resources
-
-- **Documentation**: [GitHub README](https://github.com/SimplyMinimal/fleet-mcp#readme)
-- **Issues**: [GitHub Issues](https://github.com/SimplyMinimal/fleet-mcp/issues)
-- **Fleet Documentation**: [Fleet DM Docs](https://fleetdm.com/docs)
-- **MCP Documentation**: [MCP Specification](https://modelcontextprotocol.io)
-- **osquery Documentation**: [osquery Schema](https://osquery.io/schema/)
-
-## Related Projects
-
-- [Fleet DM](https://github.com/fleetdm/fleet) - Open-source device management
-- [osquery](https://github.com/osquery/osquery) - SQL-powered system instrumentation
-- [MCP Servers](https://github.com/modelcontextprotocol/servers) - Official MCP server implementations
 
 ## Disclaimer
 
