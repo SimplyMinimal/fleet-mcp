@@ -174,3 +174,4 @@ fleet-mcp.toml
 .fleet-mcp/
 docker/
 .python-version
+project_docs/
