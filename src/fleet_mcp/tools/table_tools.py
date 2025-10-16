@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def _get_default_platform() -> str:
     """Get the default platform when detection fails.
-    
+
     Returns:
         Default platform string
     """
@@ -24,17 +24,19 @@ def _get_host_platform_with_fallback(
     host_response: dict[str, Any] | None, host_id: int
 ) -> str:
     """Extract platform from host response with proper fallback and logging.
-    
+
     Args:
         host_response: Fleet API response data
         host_id: Host ID for logging context
-        
+
     Returns:
         Platform string (detected or default)
     """
     if host_response and host_response.get("host", {}).get("platform"):
-        return host_response["host"]["platform"]
-    
+        platform = host_response["host"]["platform"]
+        if isinstance(platform, str):
+            return platform
+
     default_platform = _get_default_platform()
     logger.warning(
         f"Failed to get platform for host {host_id}: "
