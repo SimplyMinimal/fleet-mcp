@@ -121,6 +121,10 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         )
                         platform = "linux"
 
+                # Ensure platform is set (should always be set by now)
+                if not platform:
+                    platform = "linux"
+
                 # Discover tables on live host
                 tables = await cache.get_tables_for_host(client, host_id, platform)
                 discovery_method = "live_host_discovery"
@@ -322,6 +326,10 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     except Exception as e:
                         logger.warning(f"Failed to get host platform: {e}")
                         platform = "linux"
+
+                # Ensure platform is set (should always be set by now)
+                if not platform:
+                    platform = "linux"
 
                 tables = await cache.get_tables_for_host(client, host_id, platform)
             else:

@@ -273,7 +273,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                json_data = {"query": query}
+                json_data: dict[str, Any] = {"query": query}
 
                 # Add targeting parameters if provided
                 if host_ids:

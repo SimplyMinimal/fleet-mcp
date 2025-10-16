@@ -1,10 +1,19 @@
 """Configuration management for Fleet MCP."""
 
 import os
+import sys
 from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None  # type: ignore[assignment]
 
 
 class FleetConfig(BaseSettings):
@@ -94,15 +103,8 @@ def load_config(config_file: Path | None = None) -> FleetConfig:
     """
     # If we have a config file, load it and merge with environment
     if config_file and config_file.exists():
-        try:
-            import tomllib
-        except ImportError:
-            try:
-                import tomli as tomllib
-            except ImportError as e:
-                raise ImportError(
-                    "TOML support requires Python 3.11+ or 'tomli' package"
-                ) from e
+        if tomllib is None:
+            raise ImportError("TOML support requires Python 3.11+ or 'tomli' package")
 
         with open(config_file, "rb") as f:
             file_config = tomllib.load(f)
@@ -137,7 +139,8 @@ def load_config(config_file: Path | None = None) -> FleetConfig:
         return FleetConfig.model_validate(config_data)
 
     # No config file, try to create from environment variables only
-    return FleetConfig()
+    # BaseSettings will automatically load from FLEET_* environment variables
+    return FleetConfig.model_validate({})
 
 
 def get_default_config_file() -> Path:

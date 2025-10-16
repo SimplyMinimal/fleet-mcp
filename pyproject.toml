@@ -171,4 +171,5 @@ dev = [
     "mypy>=1.0.0",
     "ruff>=0.1.0",
     "coverage>=7.10.7",
+    "types-PyYAML>=6.0.0",
 ]

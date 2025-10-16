@@ -21,20 +21,20 @@ class TableSchemaCache:
     3. Bundled fallback schemas (for offline operation)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.fleet_schemas: dict[str, dict[str, Any]] = {}
         self.host_tables: dict[str, list[dict[str, Any]]] = {}
         self.last_fetch: dict[str, float] = {}
         self.fleet_schemas_loaded = False
         self.cache_ttl = 3600  # 1 hour
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize the cache by loading Fleet schemas."""
         if not self.fleet_schemas_loaded:
             await self._load_fleet_schemas()
             self.fleet_schemas_loaded = True
 
-    async def _load_fleet_schemas(self):
+    async def _load_fleet_schemas(self) -> None:
         """Load table schemas from Fleet's GitHub repository."""
         logger.info("Loading Fleet table schemas from GitHub...")
 
@@ -345,7 +345,7 @@ class TableSchemaCache:
 
         return tables
 
-    def invalidate_host(self, host_id: int):
+    def invalidate_host(self, host_id: int) -> None:
         """Invalidate cache for a specific host.
 
         Args:

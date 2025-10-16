@@ -210,7 +210,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                json_data = {}
+                json_data: dict[str, Any] = {}
 
                 if name is not None:
                     json_data["name"] = name

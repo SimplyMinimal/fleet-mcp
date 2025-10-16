@@ -71,7 +71,12 @@ class FleetClient:
         await self._ensure_client()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
         """Async context manager exit."""
         await self.close()
 
@@ -138,6 +143,7 @@ class FleetClient:
             FleetAPIError: For various API errors
         """
         await self._ensure_client()
+        assert self._client is not None  # Ensured by _ensure_client()
 
         url = self._build_url(endpoint)
 
@@ -242,7 +248,10 @@ class FleetClient:
             Parsed error data
         """
         try:
-            return response.json()
+            json_data = response.json()
+            if isinstance(json_data, dict):
+                return json_data
+            return {"message": str(json_data), "status_code": response.status_code}
         except Exception:
             return {
                 "message": response.text or "Unknown error",
