@@ -11,6 +11,38 @@ from .table_discovery import get_table_cache
 logger = logging.getLogger(__name__)
 
 
+def _get_default_platform() -> str:
+    """Get the default platform when detection fails.
+    
+    Returns:
+        Default platform string
+    """
+    return "linux"
+
+
+def _get_host_platform_with_fallback(
+    host_response: dict[str, Any] | None, host_id: int
+) -> str:
+    """Extract platform from host response with proper fallback and logging.
+    
+    Args:
+        host_response: Fleet API response data
+        host_id: Host ID for logging context
+        
+    Returns:
+        Platform string (detected or default)
+    """
+    if host_response and host_response.get("host", {}).get("platform"):
+        return host_response["host"]["platform"]
+    
+    default_platform = _get_default_platform()
+    logger.warning(
+        f"Failed to get platform for host {host_id}: "
+        f"no platform data in response, defaulting to {default_platform}"
+    )
+    return default_platform
+
+
 # Keyword aliases for better suggestion matching
 KEYWORD_ALIASES = {
     "software": [
@@ -112,18 +144,23 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         async with client:
                             host_response = await client.get(f"/hosts/{host_id}")
                             if host_response.success and host_response.data:
-                                platform = host_response.data.get("host", {}).get(
-                                    "platform", "linux"
+                                platform = _get_host_platform_with_fallback(
+                                    host_response.data, host_id
                                 )
+                            else:
+                                default_platform = _get_default_platform()
+                                logger.warning(
+                                    f"Failed to get host platform for host {host_id}: "
+                                    f"API response unsuccessful, defaulting to {default_platform}"
+                                )
+                                platform = default_platform
                     except Exception as e:
+                        default_platform = _get_default_platform()
                         logger.warning(
-                            f"Failed to get host platform: {e}, defaulting to linux"
+                            f"Failed to get host platform for host {host_id}: {e}, "
+                            f"defaulting to {default_platform}"
                         )
-                        platform = "linux"
-
-                # Ensure platform is set (should always be set by now)
-                if not platform:
-                    platform = "linux"
+                        platform = default_platform
 
                 # Discover tables on live host
                 tables = await cache.get_tables_for_host(client, host_id, platform)
