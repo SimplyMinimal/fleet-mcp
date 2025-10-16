@@ -15,29 +15,16 @@ from .server import FleetMCPServer
     "--config",
     "-c",
     type=click.Path(exists=True, path_type=Path),
-    help="Path to configuration file"
+    help="Path to configuration file",
 )
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    help="Enable verbose logging"
-)
-@click.option(
-    "--server-url",
-    envvar="FLEET_SERVER_URL",
-    help="Fleet server URL"
-)
-@click.option(
-    "--api-token",
-    envvar="FLEET_API_TOKEN",
-    help="Fleet API token"
-)
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
+@click.option("--server-url", envvar="FLEET_SERVER_URL", help="Fleet server URL")
+@click.option("--api-token", envvar="FLEET_API_TOKEN", help="Fleet API token")
 @click.option(
     "--readonly",
     envvar="FLEET_READONLY",
     is_flag=True,
-    help="Enable read-only mode (disables write operations)"
+    help="Enable read-only mode (disables write operations)",
 )
 @click.pass_context
 def cli(
@@ -46,14 +33,13 @@ def cli(
     verbose: bool,
     server_url: str | None,
     api_token: str | None,
-    readonly: bool
+    readonly: bool,
 ) -> None:
     """Fleet MCP - Model Context Protocol tool for Fleet DM integration."""
     # Configure logging
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     # Store config parameters in context for commands that need them
@@ -77,7 +63,9 @@ def _load_config(ctx: click.Context) -> FleetConfig:
             fleet_config = load_config(config_file)
         else:
             default_config = get_default_config_file()
-            fleet_config = load_config(default_config if default_config.exists() else None)
+            fleet_config = load_config(
+                default_config if default_config.exists() else None
+            )
 
         # Override with CLI arguments if provided
         config_data = fleet_config.model_dump()
@@ -104,7 +92,9 @@ def run(ctx: click.Context) -> None:
     try:
         server = FleetMCPServer(config)
         readonly_status = " (READ-ONLY MODE)" if config.readonly else ""
-        click.echo(f"Starting Fleet MCP Server for {config.server_url}{readonly_status}")
+        click.echo(
+            f"Starting Fleet MCP Server for {config.server_url}{readonly_status}"
+        )
         server.run()
     except KeyboardInterrupt:
         click.echo("\nShutting down Fleet MCP Server...")
@@ -126,7 +116,9 @@ async def test(ctx: click.Context) -> None:
             response = await client.health_check()
 
             if response.success:
-                click.echo(f"✅ Successfully connected to Fleet server at {config.server_url}")
+                click.echo(
+                    f"✅ Successfully connected to Fleet server at {config.server_url}"
+                )
                 click.echo("   Authentication: OK")
             else:
                 click.echo(f"❌ Failed to connect to Fleet server: {response.message}")
@@ -143,7 +135,7 @@ async def test(ctx: click.Context) -> None:
     "-o",
     type=click.Path(path_type=Path),
     default="fleet-mcp.toml",
-    help="Output configuration file path"
+    help="Output configuration file path",
 )
 def init_config(output: Path) -> None:
     """Initialize a configuration file template."""
@@ -167,7 +159,9 @@ max_retries = 3
 
     try:
         if output.exists():
-            if not click.confirm(f"Configuration file {output} already exists. Overwrite?"):
+            if not click.confirm(
+                f"Configuration file {output} already exists. Overwrite?"
+            ):
                 click.echo("Configuration file creation cancelled.")
                 return
 
@@ -184,6 +178,7 @@ max_retries = 3
 def version() -> None:
     """Show version information."""
     from . import __version__
+
     click.echo(f"Fleet MCP version {__version__}")
 
 

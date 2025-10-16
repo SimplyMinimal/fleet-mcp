@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register software and vulnerability management tools with the MCP server.
-    
+
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
@@ -26,10 +26,10 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
         order_direction: str = "asc",
         query: str = "",
         team_id: int | None = None,
-        vulnerable: bool | None = None
+        vulnerable: bool | None = None,
     ) -> dict[str, Any]:
         """List software inventory across the fleet.
-        
+
         Args:
             page: Page number for pagination (0-based)
             per_page: Number of software items per page
@@ -38,7 +38,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
             query: Search query to filter software by name
             team_id: Filter software by team ID
             vulnerable: Filter to only vulnerable software (true) or non-vulnerable (false)
-            
+
         Returns:
             Dict containing list of software and pagination metadata.
         """
@@ -48,7 +48,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "page": page,
                     "per_page": per_page,
                     "order_key": order_key,
-                    "order_direction": order_direction
+                    "order_direction": order_direction,
                 }
 
                 if query:
@@ -69,14 +69,14 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "total_count": response.data.get("count", len(software)),
                         "page": page,
                         "per_page": per_page,
-                        "message": f"Found {len(software)} software items"
+                        "message": f"Found {len(software)} software items",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "software": [],
-                        "count": 0
+                        "count": 0,
                     }
 
         except FleetAPIError as e:
@@ -85,16 +85,16 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to list software: {str(e)}",
                 "software": [],
-                "count": 0
+                "count": 0,
             }
 
     @mcp.tool()
     async def fleet_get_software(software_id: int) -> dict[str, Any]:
         """Get detailed information about a specific software item.
-        
+
         Args:
             software_id: ID of the software item to retrieve
-            
+
         Returns:
             Dict containing detailed software information including vulnerabilities.
         """
@@ -110,14 +110,14 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "software_id": software_id,
                         "vulnerabilities": software.get("vulnerabilities", []),
                         "hosts_count": software.get("hosts_count", 0),
-                        "message": f"Retrieved software '{software.get('name', software_id)}'"
+                        "message": f"Retrieved software '{software.get('name', software_id)}'",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "software": None,
-                        "software_id": software_id
+                        "software_id": software_id,
                     }
 
         except FleetAPIError as e:
@@ -126,14 +126,12 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to get software: {str(e)}",
                 "software": None,
-                "software_id": software_id
+                "software_id": software_id,
             }
 
     @mcp.tool()
     async def fleet_get_host_software(
-        host_id: int,
-        query: str = "",
-        vulnerable: bool | None = None
+        host_id: int, query: str = "", vulnerable: bool | None = None
     ) -> dict[str, Any]:
         """Get software installed on a specific host.
 
@@ -158,12 +156,17 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                     filtered_software = []
                     for software in all_software:
                         # Apply query filter (case-insensitive search in name)
-                        if query and query.lower() not in software.get("name", "").lower():
+                        if (
+                            query
+                            and query.lower() not in software.get("name", "").lower()
+                        ):
                             continue
 
                         # Apply vulnerable filter
                         if vulnerable is not None:
-                            software_vulnerable = len(software.get("vulnerabilities", [])) > 0
+                            software_vulnerable = (
+                                len(software.get("vulnerabilities", [])) > 0
+                            )
                             if vulnerable != software_vulnerable:
                                 continue
 
@@ -176,7 +179,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "total_software": len(all_software),
                         "host_id": host_id,
                         "hostname": host.get("hostname", "Unknown"),
-                        "message": f"Found {len(filtered_software)} software items on host {host.get('hostname', host_id)}"
+                        "message": f"Found {len(filtered_software)} software items on host {host.get('hostname', host_id)}",
                     }
                 else:
                     return {
@@ -186,7 +189,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "count": 0,
                         "total_software": 0,
                         "host_id": host_id,
-                        "hostname": "Unknown"
+                        "hostname": "Unknown",
                     }
 
         except FleetAPIError as e:
@@ -198,7 +201,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "count": 0,
                 "total_software": 0,
                 "host_id": host_id,
-                "hostname": "Unknown"
+                "hostname": "Unknown",
             }
 
     @mcp.tool()
@@ -209,10 +212,10 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
         order_direction: str = "asc",
         team_id: int | None = None,
         known_exploit: bool | None = None,
-        cve_search: str = ""
+        cve_search: str = "",
     ) -> dict[str, Any]:
         """List known vulnerabilities across the fleet.
-        
+
         Args:
             page: Page number for pagination (0-based)
             per_page: Number of vulnerabilities per page
@@ -221,7 +224,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
             team_id: Filter vulnerabilities by team ID
             known_exploit: Filter to vulnerabilities with known exploits
             cve_search: Search for specific CVE IDs
-            
+
         Returns:
             Dict containing list of vulnerabilities and pagination metadata.
         """
@@ -231,7 +234,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "page": page,
                     "per_page": per_page,
                     "order_key": order_key,
-                    "order_direction": order_direction
+                    "order_direction": order_direction,
                 }
 
                 if team_id is not None:
@@ -252,14 +255,14 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "total_count": response.data.get("count", len(vulnerabilities)),
                         "page": page,
                         "per_page": per_page,
-                        "message": f"Found {len(vulnerabilities)} vulnerabilities"
+                        "message": f"Found {len(vulnerabilities)} vulnerabilities",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "vulnerabilities": [],
-                        "count": 0
+                        "count": 0,
                     }
 
         except FleetAPIError as e:
@@ -268,7 +271,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to list vulnerabilities: {str(e)}",
                 "vulnerabilities": [],
-                "count": 0
+                "count": 0,
             }
 
     @mcp.tool()
@@ -276,7 +279,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
         query: str,
         limit: int = 50,
         team_id: int | None = None,
-        vulnerable: bool | None = None
+        vulnerable: bool | None = None,
     ) -> dict[str, Any]:
         """Search for software by name across the fleet.
 
@@ -291,10 +294,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                params = {
-                    "query": query,
-                    "per_page": min(limit, 500)
-                }
+                params = {"query": query, "per_page": min(limit, 500)}
 
                 if team_id is not None:
                     params["team_id"] = team_id
@@ -312,7 +312,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "software_titles": software_titles,
                         "count": len(software_titles),
                         "query": query,
-                        "message": f"Found {len(software_titles)} software titles matching '{query}'"
+                        "message": f"Found {len(software_titles)} software titles matching '{query}'",
                     }
                 else:
                     return {
@@ -320,7 +320,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "message": response.message,
                         "software_titles": [],
                         "count": 0,
-                        "query": query
+                        "query": query,
                     }
 
         except FleetAPIError as e:
@@ -330,13 +330,12 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to search software: {str(e)}",
                 "software_titles": [],
                 "count": 0,
-                "query": query
+                "query": query,
             }
 
     @mcp.tool()
     async def fleet_find_software_on_host(
-        hostname: str,
-        software_name: str
+        hostname: str, software_name: str
     ) -> dict[str, Any]:
         """Find specific software on a host by hostname.
 
@@ -360,7 +359,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "message": f"Failed to find host with hostname '{hostname}': {host_response.message}",
                         "hostname": hostname,
                         "software_name": software_name,
-                        "software": []
+                        "software": [],
                     }
 
                 hosts = host_response.data.get("hosts", [])
@@ -379,12 +378,16 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "hostname": hostname,
                         "software_name": software_name,
                         "software": [],
-                        "similar_hosts": [h.get("hostname", "Unknown") for h in hosts[:5]]
+                        "similar_hosts": [
+                            h.get("hostname", "Unknown") for h in hosts[:5]
+                        ],
                     }
 
                 # Get software for the host
                 host_id = target_host.get("id")
-                software_response = await fleet_get_host_software(host_id, query=software_name)
+                software_response = await fleet_get_host_software(
+                    host_id, query=software_name
+                )
 
                 if software_response.get("success"):
                     matching_software = software_response.get("software", [])
@@ -395,7 +398,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "software_name": software_name,
                         "software": matching_software,
                         "count": len(matching_software),
-                        "message": f"Found {len(matching_software)} software items matching '{software_name}' on host '{hostname}'"
+                        "message": f"Found {len(matching_software)} software items matching '{software_name}' on host '{hostname}'",
                     }
                 else:
                     return {
@@ -403,7 +406,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "message": f"Failed to get software for host '{hostname}': {software_response.get('message')}",
                         "hostname": hostname,
                         "software_name": software_name,
-                        "software": []
+                        "software": [],
                     }
 
         except FleetAPIError as e:
@@ -413,5 +416,5 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to find software on host: {str(e)}",
                 "hostname": hostname,
                 "software_name": software_name,
-                "software": []
+                "software": [],
             }

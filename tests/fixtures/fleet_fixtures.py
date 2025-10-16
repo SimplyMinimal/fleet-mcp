@@ -1,41 +1,42 @@
 """Shared test fixtures for Fleet MCP tests."""
 
 import pytest
-from fleet_mcp.config import FleetConfig
+
 from fleet_mcp.client import FleetClient
+from fleet_mcp.config import FleetConfig
 
 
 @pytest.fixture
 def test_fleet_config():
     """Create a test Fleet configuration for unit tests.
-    
+
     This uses a fake server URL and token for testing purposes.
     Default to readonly mode for safety.
     """
     return FleetConfig(
         server_url="https://test.fleet.com",
         api_token="test-token-123456789",
-        readonly=True
+        readonly=True,
     )
 
 
 @pytest.fixture
 def test_fleet_config_write_mode():
     """Create a test Fleet configuration with write mode enabled.
-    
+
     This uses a fake server URL and token for testing purposes.
     """
     return FleetConfig(
         server_url="https://test.fleet.com",
         api_token="test-token-123456789",
-        readonly=False
+        readonly=False,
     )
 
 
 @pytest.fixture
 def test_fleet_client(test_fleet_config):
     """Create a test Fleet client for unit tests.
-    
+
     Uses the test configuration with mocked server.
     """
     return FleetClient(test_fleet_config)
@@ -44,29 +45,29 @@ def test_fleet_client(test_fleet_config):
 @pytest.fixture
 def live_fleet_config():
     """Configuration for live Fleet server (integration tests).
-    
+
     This should be configured with actual Fleet server credentials.
     Default to readonly mode for safety in tests.
-    
+
     Note: Update the server_url and api_token for your environment,
     or use environment variables.
     """
     import os
-    
+
     return FleetConfig(
         server_url=os.getenv("FLEET_SERVER_URL", "http://192.168.68.125:1337"),
         api_token=os.getenv(
             "FLEET_API_TOKEN",
-            "+nHwmPaf7wSt9sg8qvNX0/LDL26TdM6wxXYD/4W9tfzmNeq+5GWBzmR15Oq6GpMgGzkLpPcH3vq4i9pXi/+lLw=="
+            "+nHwmPaf7wSt9sg8qvNX0/LDL26TdM6wxXYD/4W9tfzmNeq+5GWBzmR15Oq6GpMgGzkLpPcH3vq4i9pXi/+lLw==",
         ),
-        readonly=True
+        readonly=True,
     )
 
 
 @pytest.fixture
 def live_fleet_client(live_fleet_config):
     """Create a Fleet client connected to live server (integration tests).
-    
+
     Uses the live Fleet server configuration.
     """
     return FleetClient(live_fleet_config)
@@ -81,7 +82,7 @@ def sample_host_data():
         "uuid": "test-uuid-123",
         "platform": "ubuntu",
         "osquery_version": "5.17.0",
-        "status": "online"
+        "status": "online",
     }
 
 
@@ -93,7 +94,7 @@ def sample_query_data():
         "name": "Test Query",
         "description": "A test query",
         "query": "SELECT * FROM system_info;",
-        "saved": True
+        "saved": True,
     }
 
 
@@ -107,6 +108,5 @@ def sample_policy_data():
         "query": "SELECT 1;",
         "critical": False,
         "passing_host_count": 5,
-        "failing_host_count": 2
+        "failing_host_count": 2,
     }
-

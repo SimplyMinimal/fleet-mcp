@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 
 def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register SELECT-only query tools with validation.
-    
+
     These tools allow running queries in read-only mode, but validate that
     queries are SELECT-only before execution.
-    
+
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
@@ -31,10 +31,10 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
         query: str,
         host_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
-        team_ids: list[int] | None = None
+        team_ids: list[int] | None = None,
     ) -> dict[str, Any]:
         """Execute a SELECT-only live query against specified hosts.
-        
+
         This tool is available in read-only mode with allow_select_queries enabled.
         Only SELECT statements are allowed - any data modification operations
         (INSERT, UPDATE, DELETE, etc.) will be rejected.
@@ -55,9 +55,9 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Query validation failed: {error_msg}. Only SELECT queries are allowed in read-only mode.",
                 "campaign": None,
-                "query": query
+                "query": query,
             }
-        
+
         try:
             async with client:
                 json_data: dict[str, Any] = {"query": query}
@@ -79,14 +79,14 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "campaign": campaign,
                         "campaign_id": campaign.get("id"),
                         "query": query,
-                        "message": f"Started live query campaign {campaign.get('id')} (SELECT-only validated)"
+                        "message": f"Started live query campaign {campaign.get('id')} (SELECT-only validated)",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "campaign": None,
-                        "query": query
+                        "query": query,
                     }
 
         except FleetAPIError as e:
@@ -95,7 +95,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to run live query: {str(e)}",
                 "campaign": None,
-                "query": query
+                "query": query,
             }
 
     @mcp.tool()
@@ -103,10 +103,10 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
         query_id: int,
         host_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
-        team_ids: list[int] | None = None
+        team_ids: list[int] | None = None,
     ) -> dict[str, Any]:
         """Run a saved query against specified hosts (SELECT-only validation).
-        
+
         This tool is available in read-only mode with allow_select_queries enabled.
         The saved query will be validated to ensure it's SELECT-only before execution.
 
@@ -123,18 +123,18 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
             async with client:
                 # First, get the query to validate it
                 query_response = await client.get(f"/queries/{query_id}")
-                
+
                 if not query_response.success or not query_response.data:
                     return {
                         "success": False,
                         "message": f"Failed to retrieve query {query_id}: {query_response.message}",
                         "campaign": None,
-                        "query_id": query_id
+                        "query_id": query_id,
                     }
-                
+
                 query_data = query_response.data.get("query", {})
                 query_sql = query_data.get("query", "")
-                
+
                 # Validate query is SELECT-only
                 is_valid, error_msg = validate_select_query(query_sql)
                 if not is_valid:
@@ -143,9 +143,9 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "message": f"Saved query validation failed: {error_msg}. Only SELECT queries are allowed in read-only mode.",
                         "campaign": None,
                         "query_id": query_id,
-                        "query_name": query_data.get("name", "")
+                        "query_name": query_data.get("name", ""),
                     }
-                
+
                 # Run the query
                 json_data: dict[str, Any] = {"query_id": query_id}
 
@@ -167,14 +167,14 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "campaign_id": campaign.get("id"),
                         "query_id": query_id,
                         "query_name": query_data.get("name", ""),
-                        "message": f"Started campaign {campaign.get('id')} for query '{query_data.get('name')}' (SELECT-only validated)"
+                        "message": f"Started campaign {campaign.get('id')} for query '{query_data.get('name')}' (SELECT-only validated)",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "campaign": None,
-                        "query_id": query_id
+                        "query_id": query_id,
                     }
 
         except FleetAPIError as e:
@@ -183,7 +183,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to run saved query: {str(e)}",
                 "campaign": None,
-                "query_id": query_id
+                "query_id": query_id,
             }
 
     @mcp.tool()
@@ -192,7 +192,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         This tool is available in read-only mode with allow_select_queries enabled.
         Only SELECT statements are allowed - any data modification operations will be rejected.
-        
+
         The query runs immediately against a single host and waits for results.
         The query will timeout if the host doesn't respond within the configured
         FLEET_LIVE_QUERY_REST_PERIOD (default 25 seconds).
@@ -213,14 +213,13 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "host_id": host_id,
                 "query": query,
                 "rows": [],
-                "row_count": 0
+                "row_count": 0,
             }
-        
+
         try:
             async with client:
                 response = await client.post(
-                    f"/hosts/{host_id}/query",
-                    json_data={"query": query}
+                    f"/hosts/{host_id}/query", json_data={"query": query}
                 )
 
                 if response.success and response.data:
@@ -231,7 +230,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "query": query,
                         "rows": rows,
                         "row_count": len(rows),
-                        "message": f"Query executed successfully on host {host_id}, returned {len(rows)} rows (SELECT-only validated)"
+                        "message": f"Query executed successfully on host {host_id}, returned {len(rows)} rows (SELECT-only validated)",
                     }
                 else:
                     return {
@@ -240,7 +239,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "host_id": host_id,
                         "query": query,
                         "rows": [],
-                        "row_count": 0
+                        "row_count": 0,
                     }
 
         except FleetAPIError as e:
@@ -251,16 +250,18 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "host_id": host_id,
                 "query": query,
                 "rows": [],
-                "row_count": 0
+                "row_count": 0,
             }
 
     @mcp.tool()
-    async def fleet_query_host_by_identifier(identifier: str, query: str) -> dict[str, Any]:
+    async def fleet_query_host_by_identifier(
+        identifier: str, query: str
+    ) -> dict[str, Any]:
         """Run a SELECT-only ad-hoc query against a host identified by UUID/hostname/serial.
 
         This tool is available in read-only mode with allow_select_queries enabled.
         Only SELECT statements are allowed - any data modification operations will be rejected.
-        
+
         The query runs immediately against a single host and waits for results.
         The query will timeout if the host doesn't respond within the configured
         FLEET_LIVE_QUERY_REST_PERIOD (default 25 seconds).
@@ -281,9 +282,9 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "identifier": identifier,
                 "query": query,
                 "rows": [],
-                "row_count": 0
+                "row_count": 0,
             }
-        
+
         try:
             async with client:
                 # First get the host to find its ID
@@ -296,7 +297,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "identifier": identifier,
                         "query": query,
                         "rows": [],
-                        "row_count": 0
+                        "row_count": 0,
                     }
 
                 host = response.data.get("host", {})
@@ -304,8 +305,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 # Now run the query
                 query_response = await client.post(
-                    f"/hosts/{host_id}/query",
-                    json_data={"query": query}
+                    f"/hosts/{host_id}/query", json_data={"query": query}
                 )
 
                 if query_response.success and query_response.data:
@@ -318,7 +318,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "query": query,
                         "rows": rows,
                         "row_count": len(rows),
-                        "message": f"Query executed successfully on {host.get('hostname', identifier)}, returned {len(rows)} rows (SELECT-only validated)"
+                        "message": f"Query executed successfully on {host.get('hostname', identifier)}, returned {len(rows)} rows (SELECT-only validated)",
                     }
                 else:
                     return {
@@ -328,7 +328,7 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "host_id": host_id,
                         "query": query,
                         "rows": [],
-                        "row_count": 0
+                        "row_count": 0,
                     }
 
         except FleetAPIError as e:
@@ -339,6 +339,5 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "identifier": identifier,
                 "query": query,
                 "rows": [],
-                "row_count": 0
+                "row_count": 0,
             }
-

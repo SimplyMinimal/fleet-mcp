@@ -37,10 +37,10 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         team_id: int | None = None,
         status: str | None = None,
         order_key: str = "hostname",
-        order_direction: str = "asc"
+        order_direction: str = "asc",
     ) -> dict[str, Any]:
         """List hosts in Fleet with optional filtering and pagination.
-        
+
         Args:
             page: Page number for pagination (0-based)
             per_page: Number of hosts per page (max 500)
@@ -49,7 +49,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             status: Filter by host status (online, offline, mia)
             order_key: Field to order by (hostname, computer_name, platform, status)
             order_direction: Sort direction (asc, desc)
-            
+
         Returns:
             Dict containing list of hosts and pagination metadata.
         """
@@ -59,7 +59,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "page": page,
                     "per_page": min(per_page, 500),  # Fleet API limit
                     "order_key": order_key,
-                    "order_direction": order_direction
+                    "order_direction": order_direction,
                 }
 
                 if query:
@@ -80,14 +80,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "total_count": response.data.get("count", len(hosts)),
                         "page": page,
                         "per_page": per_page,
-                        "message": f"Found {len(hosts)} hosts"
+                        "message": f"Found {len(hosts)} hosts",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "hosts": [],
-                        "count": 0
+                        "count": 0,
                     }
 
         except FleetAPIError as e:
@@ -96,16 +96,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to list hosts: {str(e)}",
                 "hosts": [],
-                "count": 0
+                "count": 0,
             }
 
     @mcp.tool()
     async def fleet_get_host(host_id: int) -> dict[str, Any]:
         """Get detailed information about a specific host.
-        
+
         Args:
             host_id: The ID of the host to retrieve
-            
+
         Returns:
             Dict containing detailed host information.
         """
@@ -118,43 +118,33 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     return {
                         "success": True,
                         "host": host,
-                        "message": f"Retrieved host {host.get('hostname', host_id)}"
+                        "message": f"Retrieved host {host.get('hostname', host_id)}",
                     }
                 else:
-                    return {
-                        "success": False,
-                        "message": response.message,
-                        "host": None
-                    }
+                    return {"success": False, "message": response.message, "host": None}
 
         except FleetAPIError as e:
             logger.error(f"Failed to get host {host_id}: {e}")
             return {
                 "success": False,
                 "message": f"Failed to get host: {str(e)}",
-                "host": None
+                "host": None,
             }
 
     @mcp.tool()
-    async def fleet_search_hosts(
-        query: str,
-        limit: int = 50
-    ) -> dict[str, Any]:
+    async def fleet_search_hosts(query: str, limit: int = 50) -> dict[str, Any]:
         """Search for hosts by hostname, UUID, hardware serial, or IP address.
-        
+
         Args:
             query: Search term (hostname, UUID, serial number, or IP)
             limit: Maximum number of results to return
-            
+
         Returns:
             Dict containing matching hosts.
         """
         try:
             async with client:
-                params = {
-                    "query": query,
-                    "per_page": min(limit, 500)
-                }
+                params = {"query": query, "per_page": min(limit, 500)}
 
                 response = await client.get("/hosts", params=params)
 
@@ -165,7 +155,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "hosts": hosts,
                         "count": len(hosts),
                         "query": query,
-                        "message": f"Found {len(hosts)} hosts matching '{query}'"
+                        "message": f"Found {len(hosts)} hosts matching '{query}'",
                     }
                 else:
                     return {
@@ -173,7 +163,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "message": response.message,
                         "hosts": [],
                         "count": 0,
-                        "query": query
+                        "query": query,
                     }
 
         except FleetAPIError as e:
@@ -183,16 +173,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to search hosts: {str(e)}",
                 "hosts": [],
                 "count": 0,
-                "query": query
+                "query": query,
             }
 
     @mcp.tool()
     async def fleet_get_host_by_identifier(identifier: str) -> dict[str, Any]:
         """Get host by hostname, UUID, or hardware serial number.
-        
+
         Args:
             identifier: Host identifier (hostname, UUID, or hardware serial)
-            
+
         Returns:
             Dict containing host information if found.
         """
@@ -206,14 +196,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "success": True,
                         "host": host,
                         "identifier": identifier,
-                        "message": f"Found host with identifier '{identifier}'"
+                        "message": f"Found host with identifier '{identifier}'",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "host": None,
-                        "identifier": identifier
+                        "identifier": identifier,
                     }
 
         except FleetAPIError as e:
@@ -222,7 +212,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to get host: {str(e)}",
                 "host": None,
-                "identifier": identifier
+                "identifier": identifier,
             }
 
 
@@ -237,13 +227,13 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_delete_host(host_id: int) -> dict[str, Any]:
         """Delete a host from Fleet.
-        
+
         Note: A deleted host will fail authentication and may attempt to re-enroll
         if it still has a valid enroll secret.
-        
+
         Args:
             host_id: The ID of the host to delete
-            
+
         Returns:
             Dict indicating success or failure of the deletion.
         """
@@ -253,8 +243,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 return {
                     "success": response.success,
-                    "message": response.message or f"Host {host_id} deleted successfully",
-                    "host_id": host_id
+                    "message": response.message
+                    or f"Host {host_id} deleted successfully",
+                    "host_id": host_id,
                 }
 
         except FleetAPIError as e:
@@ -262,14 +253,11 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to delete host: {str(e)}",
-                "host_id": host_id
+                "host_id": host_id,
             }
 
     @mcp.tool()
-    async def fleet_transfer_hosts(
-        team_id: int,
-        host_ids: list[int]
-    ) -> dict[str, Any]:
+    async def fleet_transfer_hosts(team_id: int, host_ids: list[int]) -> dict[str, Any]:
         """Transfer hosts to a different team.
 
         Args:
@@ -284,17 +272,18 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 # Convert team_id=0 to null for "No team"
                 json_data = {
                     "team_id": None if team_id == 0 else team_id,
-                    "hosts": host_ids
+                    "hosts": host_ids,
                 }
 
                 response = await client.post("/hosts/transfer", json_data=json_data)
 
                 return {
                     "success": response.success,
-                    "message": response.message or f"Transferred {len(host_ids)} hosts to team {team_id}",
+                    "message": response.message
+                    or f"Transferred {len(host_ids)} hosts to team {team_id}",
                     "team_id": team_id,
                     "host_ids": host_ids,
-                    "transferred_count": len(host_ids) if response.success else 0
+                    "transferred_count": len(host_ids) if response.success else 0,
                 }
 
         except FleetAPIError as e:
@@ -304,7 +293,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to transfer hosts: {str(e)}",
                 "team_id": team_id,
                 "host_ids": host_ids,
-                "transferred_count": 0
+                "transferred_count": 0,
             }
 
     @mcp.tool()
@@ -325,7 +314,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 json_data = {"query": query}
-                response = await client.post(f"/hosts/{host_id}/query", json_data=json_data)
+                response = await client.post(
+                    f"/hosts/{host_id}/query", json_data=json_data
+                )
 
                 if response.success and response.data:
                     return {
@@ -336,7 +327,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "error": response.data.get("error"),
                         "rows": response.data.get("rows", []),
                         "row_count": len(response.data.get("rows", [])),
-                        "message": f"Query executed on host {host_id}"
+                        "message": f"Query executed on host {host_id}",
                     }
                 else:
                     return {
@@ -345,7 +336,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "host_id": host_id,
                         "query": query,
                         "rows": [],
-                        "row_count": 0
+                        "row_count": 0,
                     }
 
         except FleetAPIError as e:
@@ -356,11 +347,13 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "host_id": host_id,
                 "query": query,
                 "rows": [],
-                "row_count": 0
+                "row_count": 0,
             }
 
     @mcp.tool()
-    async def fleet_query_host_by_identifier(identifier: str, query: str) -> dict[str, Any]:
+    async def fleet_query_host_by_identifier(
+        identifier: str, query: str
+    ) -> dict[str, Any]:
         """Run an ad-hoc live query against a host identified by UUID/hostname/serial.
 
         This runs a query immediately against a single host and waits for results.
@@ -377,7 +370,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             async with client:
                 json_data = {"query": query}
-                response = await client.post(f"/hosts/identifier/{identifier}/query", json_data=json_data)
+                response = await client.post(
+                    f"/hosts/identifier/{identifier}/query", json_data=json_data
+                )
 
                 if response.success and response.data:
                     return {
@@ -388,7 +383,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "error": response.data.get("error"),
                         "rows": response.data.get("rows", []),
                         "row_count": len(response.data.get("rows", [])),
-                        "message": f"Query executed on host {identifier}"
+                        "message": f"Query executed on host {identifier}",
                     }
                 else:
                     return {
@@ -397,7 +392,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "identifier": identifier,
                         "query": query,
                         "rows": [],
-                        "row_count": 0
+                        "row_count": 0,
                     }
 
         except FleetAPIError as e:
@@ -408,5 +403,5 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "identifier": identifier,
                 "query": query,
                 "rows": [],
-                "row_count": 0
+                "row_count": 0,
             }

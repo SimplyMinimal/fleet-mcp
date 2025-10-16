@@ -11,43 +11,30 @@ class FleetConfig(BaseSettings):
     """Configuration for Fleet DM connection."""
 
     server_url: str = Field(
-        ...,
-        description="Fleet server URL (e.g., https://fleet.example.com)"
+        ..., description="Fleet server URL (e.g., https://fleet.example.com)"
     )
 
-    api_token: str = Field(
-        ...,
-        description="Fleet API token for authentication"
-    )
+    api_token: str = Field(..., description="Fleet API token for authentication")
 
-    verify_ssl: bool = Field(
-        default=True,
-        description="Verify SSL certificates"
-    )
+    verify_ssl: bool = Field(default=True, description="Verify SSL certificates")
 
-    timeout: int = Field(
-        default=30,
-        description="Request timeout in seconds"
-    )
+    timeout: int = Field(default=30, description="Request timeout in seconds")
 
     max_retries: int = Field(
-        default=3,
-        description="Maximum number of retries for failed requests"
+        default=3, description="Maximum number of retries for failed requests"
     )
 
     user_agent: str = Field(
-        default="fleet-mcp/0.1.0",
-        description="User agent string for API requests"
+        default="fleet-mcp/0.1.0", description="User agent string for API requests"
     )
 
     readonly: bool = Field(
-        default=True,
-        description="Enable read-only mode (disables write operations)"
+        default=True, description="Enable read-only mode (disables write operations)"
     )
 
     allow_select_queries: bool = Field(
         default=False,
-        description="Allow SELECT-only queries in read-only mode (enables fleet_run_live_query, fleet_run_saved_query, fleet_query_host with validation)"
+        description="Allow SELECT-only queries in read-only mode (enables fleet_run_live_query, fleet_run_saved_query, fleet_query_host with validation)",
     )
 
     @field_validator("server_url")
@@ -90,10 +77,7 @@ class FleetConfig(BaseSettings):
 
         return v
 
-    model_config = {
-        "env_prefix": "FLEET_",
-        "case_sensitive": False
-    }
+    model_config = {"env_prefix": "FLEET_", "case_sensitive": False}
 
 
 def load_config(config_file: Path | None = None) -> FleetConfig:
@@ -115,10 +99,10 @@ def load_config(config_file: Path | None = None) -> FleetConfig:
         except ImportError:
             try:
                 import tomli as tomllib
-            except ImportError:
+            except ImportError as e:
                 raise ImportError(
                     "TOML support requires Python 3.11+ or 'tomli' package"
-                )
+                ) from e
 
         with open(config_file, "rb") as f:
             file_config = tomllib.load(f)
@@ -139,7 +123,11 @@ def load_config(config_file: Path | None = None) -> FleetConfig:
             if env_var_name in os.environ:
                 env_value = os.environ[env_var_name]
                 # Convert string values to appropriate types
-                if key in ["verify_ssl", "readonly", "allow_select_queries"] and isinstance(env_value, str):
+                if key in [
+                    "verify_ssl",
+                    "readonly",
+                    "allow_select_queries",
+                ] and isinstance(env_value, str):
                     config_data[key] = env_value.lower() in ("true", "1", "yes", "on")
                 elif key in ["timeout", "max_retries"] and isinstance(env_value, str):
                     config_data[key] = int(env_value)

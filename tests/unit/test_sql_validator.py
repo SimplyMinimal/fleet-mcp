@@ -1,6 +1,7 @@
 """Tests for SQL query validation."""
 
 import pytest
+
 from fleet_mcp.utils.sql_validator import is_select_only_query, validate_select_query
 
 
@@ -41,7 +42,9 @@ class TestSQLValidator:
 
     def test_select_with_group_by(self):
         """Test SELECT queries with GROUP BY."""
-        assert is_select_only_query("SELECT status, COUNT(*) FROM hosts GROUP BY status")
+        assert is_select_only_query(
+            "SELECT status, COUNT(*) FROM hosts GROUP BY status"
+        )
 
     def test_multiple_select_statements(self):
         """Test multiple SELECT statements separated by semicolons."""
@@ -60,7 +63,9 @@ class TestSQLValidator:
     def test_insert_query_rejected(self):
         """Test that INSERT queries are rejected."""
         assert not is_select_only_query("INSERT INTO users VALUES (1, 'test')")
-        assert not is_select_only_query("INSERT INTO users (id, name) VALUES (1, 'test')")
+        assert not is_select_only_query(
+            "INSERT INTO users (id, name) VALUES (1, 'test')"
+        )
 
     def test_update_query_rejected(self):
         """Test that UPDATE queries are rejected."""
@@ -78,12 +83,16 @@ class TestSQLValidator:
 
     def test_create_query_rejected(self):
         """Test that CREATE queries are rejected."""
-        assert not is_select_only_query("CREATE TABLE users (id INT, name VARCHAR(100))")
+        assert not is_select_only_query(
+            "CREATE TABLE users (id INT, name VARCHAR(100))"
+        )
         assert not is_select_only_query("CREATE INDEX idx_name ON users(name)")
 
     def test_alter_query_rejected(self):
         """Test that ALTER queries are rejected."""
-        assert not is_select_only_query("ALTER TABLE users ADD COLUMN email VARCHAR(100)")
+        assert not is_select_only_query(
+            "ALTER TABLE users ADD COLUMN email VARCHAR(100)"
+        )
 
     def test_truncate_query_rejected(self):
         """Test that TRUNCATE queries are rejected."""
@@ -164,7 +173,6 @@ class TestSQLValidator:
         """Test SELECT with DELETE as part of a string value."""
         # Note: This is a limitation - we can't perfectly parse SQL strings
         # But for security, we err on the side of caution
-        query = "SELECT * FROM users WHERE action = 'DELETE'"
         # This might fail depending on implementation, which is acceptable for security
         # The validator is conservative
 
@@ -182,7 +190,7 @@ class TestSQLValidator:
     def test_complex_select_query(self):
         """Test complex but valid SELECT query."""
         query = """
-        SELECT 
+        SELECT
             u.id,
             u.name,
             COUNT(h.id) as host_count
@@ -210,4 +218,3 @@ class TestSQLValidator:
         SELECT * FROM active_users
         """
         assert is_select_only_query(query)
-

@@ -30,14 +30,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
-    async def fleet_list_policies(
-        team_id: int | None = None
-    ) -> dict[str, Any]:
+    async def fleet_list_policies(team_id: int | None = None) -> dict[str, Any]:
         """List all policies in Fleet.
-        
+
         Args:
             team_id: Filter policies by team ID
-            
+
         Returns:
             Dict containing list of policies.
         """
@@ -55,14 +53,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "success": True,
                         "policies": policies,
                         "count": len(policies),
-                        "message": f"Found {len(policies)} policies"
+                        "message": f"Found {len(policies)} policies",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "policies": [],
-                        "count": 0
+                        "count": 0,
                     }
 
         except FleetAPIError as e:
@@ -71,20 +69,19 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to list policies: {str(e)}",
                 "policies": [],
-                "count": 0
+                "count": 0,
             }
 
     @mcp.tool()
     async def fleet_get_policy_results(
-        policy_id: int,
-        team_id: int | None = None
+        policy_id: int, team_id: int | None = None
     ) -> dict[str, Any]:
         """Get compliance results for a specific policy.
-        
+
         Args:
             policy_id: ID of the policy to get results for
             team_id: Filter results by team ID
-            
+
         Returns:
             Dict containing policy compliance results.
         """
@@ -104,14 +101,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "policy_id": policy_id,
                         "passing_host_count": policy.get("passing_host_count", 0),
                         "failing_host_count": policy.get("failing_host_count", 0),
-                        "message": f"Policy '{policy.get('name')}' results retrieved"
+                        "message": f"Policy '{policy.get('name')}' results retrieved",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "policy": None,
-                        "policy_id": policy_id
+                        "policy_id": policy_id,
                     }
 
         except FleetAPIError as e:
@@ -120,7 +117,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to get policy results: {str(e)}",
                 "policy": None,
-                "policy_id": policy_id
+                "policy_id": policy_id,
             }
 
 
@@ -139,7 +136,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         description: str | None = None,
         resolution: str | None = None,
         team_id: int | None = None,
-        critical: bool = False
+        critical: bool = False,
     ) -> dict[str, Any]:
         """Create a new compliance policy in Fleet.
 
@@ -156,11 +153,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                json_data = {
-                    "name": name,
-                    "query": query,
-                    "critical": critical
-                }
+                json_data = {"name": name, "query": query, "critical": critical}
 
                 if description:
                     json_data["description"] = description
@@ -176,13 +169,13 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     return {
                         "success": True,
                         "policy": policy,
-                        "message": f"Created policy '{name}' with ID {policy.get('id')}"
+                        "message": f"Created policy '{name}' with ID {policy.get('id')}",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
-                        "policy": None
+                        "policy": None,
                     }
 
         except FleetAPIError as e:
@@ -190,7 +183,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to create policy: {str(e)}",
-                "policy": None
+                "policy": None,
             }
 
     @mcp.tool()
@@ -200,10 +193,10 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         query: str | None = None,
         description: str | None = None,
         resolution: str | None = None,
-        critical: bool | None = None
+        critical: bool | None = None,
     ) -> dict[str, Any]:
         """Update an existing policy in Fleet.
-        
+
         Args:
             policy_id: ID of the policy to update
             name: New name for the policy
@@ -211,7 +204,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             description: New description for the policy
             resolution: New resolution steps for the policy
             critical: Whether this is a critical policy
-            
+
         Returns:
             Dict containing the updated policy information.
         """
@@ -235,10 +228,12 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "success": False,
                         "message": "No fields provided to update",
                         "policy": None,
-                        "policy_id": policy_id
+                        "policy_id": policy_id,
                     }
 
-                response = await client.patch(f"/policies/{policy_id}", json_data=json_data)
+                response = await client.patch(
+                    f"/policies/{policy_id}", json_data=json_data
+                )
 
                 if response.success and response.data:
                     policy = response.data.get("policy", {})
@@ -246,14 +241,14 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "success": True,
                         "policy": policy,
                         "policy_id": policy_id,
-                        "message": f"Updated policy '{policy.get('name')}'"
+                        "message": f"Updated policy '{policy.get('name')}'",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "policy": None,
-                        "policy_id": policy_id
+                        "policy_id": policy_id,
                     }
 
         except FleetAPIError as e:
@@ -262,7 +257,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to update policy: {str(e)}",
                 "policy": None,
-                "policy_id": policy_id
+                "policy_id": policy_id,
             }
 
     @mcp.tool()
@@ -283,8 +278,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 return {
                     "success": response.success,
-                    "message": response.message or f"Policy {policy_id} deleted successfully",
-                    "policy_id": policy_id
+                    "message": response.message
+                    or f"Policy {policy_id} deleted successfully",
+                    "policy_id": policy_id,
                 }
 
         except FleetAPIError as e:
@@ -292,5 +288,5 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to delete policy: {str(e)}",
-                "policy_id": policy_id
+                "policy_id": policy_id,
             }

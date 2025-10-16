@@ -5,7 +5,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
 from .table_discovery import get_table_cache
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,14 @@ logger = logging.getLogger(__name__)
 
 # Keyword aliases for better suggestion matching
 KEYWORD_ALIASES = {
-    "software": ["applications", "programs", "packages", "apps", "installed", "install"],
+    "software": [
+        "applications",
+        "programs",
+        "packages",
+        "apps",
+        "installed",
+        "install",
+    ],
     "network": ["connections", "sockets", "ports", "interfaces", "net", "tcp", "udp"],
     "users": ["accounts", "logins", "logged", "sessions"],
     "processes": ["running", "tasks", "services", "procs"],
@@ -70,7 +77,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         search: str | None = None,
         evented_only: bool = False,
         limit: int = 100,
-        include_custom: bool = True
+        include_custom: bool = True,
     ) -> dict[str, Any]:
         """List all available osquery tables with their schemas and descriptions.
 
@@ -105,10 +112,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         async with client:
                             host_response = await client.get(f"/hosts/{host_id}")
                             if host_response.success and host_response.data:
-                                platform = host_response.data.get('host', {}).get('platform', 'linux')
+                                platform = host_response.data.get("host", {}).get(
+                                    "platform", "linux"
+                                )
                     except Exception as e:
-                        logger.warning(f"Failed to get host platform: {e}, defaulting to linux")
-                        platform = 'linux'
+                        logger.warning(
+                            f"Failed to get host platform: {e}, defaulting to linux"
+                        )
+                        platform = "linux"
 
                 # Discover tables on live host
                 tables = await cache.get_tables_for_host(client, host_id, platform)
@@ -116,7 +127,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             else:
                 # Use Fleet schemas only
                 if not platform:
-                    platform = 'linux'  # Default platform
+                    platform = "linux"  # Default platform
 
                 tables = cache._get_fleet_schemas_by_platform(platform)
                 discovery_method = "fleet_schemas_only"
@@ -125,27 +136,31 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             filtered_tables = []
             for table in tables:
                 # Custom table filter
-                if not include_custom and table.get('is_custom', False):
+                if not include_custom and table.get("is_custom", False):
                     continue
 
                 # Platform filter (additional filtering if specified)
-                if platform and platform.lower() not in [p.lower() for p in table.get('platforms', [])]:
+                if platform and platform.lower() not in [
+                    p.lower() for p in table.get("platforms", [])
+                ]:
                     continue
 
                 # Evented filter
-                if evented_only and not table.get('evented', False):
+                if evented_only and not table.get("evented", False):
                     continue
 
                 # Search filter
                 if search:
                     search_lower = search.lower()
-                    table_name = table.get('name', '').lower()
-                    description = table.get('description', '').lower()
-                    columns = [col.lower() for col in table.get('columns', [])]
+                    table_name = table.get("name", "").lower()
+                    description = table.get("description", "").lower()
+                    columns = [col.lower() for col in table.get("columns", [])]
 
-                    if not (search_lower in table_name or
-                           search_lower in description or
-                           any(search_lower in col for col in columns)):
+                    if not (
+                        search_lower in table_name
+                        or search_lower in description
+                        or any(search_lower in col for col in columns)
+                    ):
                         continue
 
                 filtered_tables.append(table)
@@ -155,7 +170,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     break
 
             # Count custom vs known tables
-            custom_count = len([t for t in filtered_tables if t.get('is_custom', False)])
+            custom_count = len(
+                [t for t in filtered_tables if t.get("is_custom", False)]
+            )
             known_count = len(filtered_tables) - custom_count
 
             return {
@@ -172,9 +189,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "search": search,
                     "evented_only": evented_only,
                     "include_custom": include_custom,
-                    "limit": limit
+                    "limit": limit,
                 },
-                "message": f"Found {len(filtered_tables)} osquery tables ({known_count} known, {custom_count} custom)"
+                "message": f"Found {len(filtered_tables)} osquery tables ({known_count} known, {custom_count} custom)",
             }
 
         except Exception as e:
@@ -183,13 +200,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to list osquery tables: {str(e)}",
                 "tables": [],
-                "count": 0
+                "count": 0,
             }
 
     @mcp.tool()
     async def fleet_get_osquery_table_schema(
-        table_name: str,
-        host_id: int | None = None
+        table_name: str, host_id: int | None = None
     ) -> dict[str, Any]:
         """Get detailed schema information for a specific osquery table.
 
@@ -207,12 +223,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             # Get tables
             if host_id:
                 # Get host platform
-                platform = 'linux'  # Default
+                platform = "linux"  # Default
                 try:
                     async with client:
                         host_response = await client.get(f"/hosts/{host_id}")
                         if host_response.success and host_response.data:
-                            platform = host_response.data.get('host', {}).get('platform', 'linux')
+                            platform = host_response.data.get("host", {}).get(
+                                "platform", "linux"
+                            )
                 except Exception as e:
                     logger.warning(f"Failed to get host platform: {e}")
 
@@ -221,16 +239,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 # Use all Fleet schemas
                 tables = []
                 for name, schema in cache.fleet_schemas.items():
-                    tables.append({
-                        'name': name,
-                        **schema,
-                        'is_custom': False
-                    })
+                    tables.append({"name": name, **schema, "is_custom": False})
 
             # Find the specific table
             table_info = None
             for table in tables:
-                if table.get('name', '').lower() == table_name.lower():
+                if table.get("name", "").lower() == table_name.lower():
                     table_info = table
                     break
 
@@ -238,13 +252,13 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 return {
                     "success": False,
                     "message": f"Table '{table_name}' not found. Try using fleet_list_osquery_tables to see available tables.",
-                    "table": None
+                    "table": None,
                 }
 
             return {
                 "success": True,
                 "table": table_info,
-                "message": f"Retrieved schema for table '{table_name}'"
+                "message": f"Retrieved schema for table '{table_name}'",
             }
 
         except Exception as e:
@@ -252,7 +266,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to get table schema: {str(e)}",
-                "table": None
+                "table": None,
             }
 
     @mcp.tool()
@@ -260,7 +274,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         query_intent: str,
         host_id: int | None = None,
         platform: str | None = None,
-        limit: int = 10
+        limit: int = 10,
     ) -> dict[str, Any]:
         """Suggest relevant osquery tables based on query intent or keywords.
 
@@ -302,10 +316,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         async with client:
                             host_response = await client.get(f"/hosts/{host_id}")
                             if host_response.success and host_response.data:
-                                platform = host_response.data.get('host', {}).get('platform', 'linux')
+                                platform = host_response.data.get("host", {}).get(
+                                    "platform", "linux"
+                                )
                     except Exception as e:
                         logger.warning(f"Failed to get host platform: {e}")
-                        platform = 'linux'
+                        platform = "linux"
 
                 tables = await cache.get_tables_for_host(client, host_id, platform)
             else:
@@ -316,11 +332,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     # All tables
                     tables = []
                     for name, schema in cache.fleet_schemas.items():
-                        tables.append({
-                            'name': name,
-                            **schema,
-                            'is_custom': False
-                        })
+                        tables.append({"name": name, **schema, "is_custom": False})
 
             # Expand keywords with synonyms
             query_keywords = _expand_keywords(query_intent)
@@ -329,14 +341,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
             for table in tables:
                 # Platform filter (if specified and not already filtered)
-                if platform and platform.lower() not in [p.lower() for p in table.get('platforms', [])]:
+                if platform and platform.lower() not in [
+                    p.lower() for p in table.get("platforms", [])
+                ]:
                     continue
 
                 # Calculate relevance score
                 score = 0
-                table_name = table.get('name', '').lower()
-                description = table.get('description', '').lower()
-                columns = [col.lower() for col in table.get('columns', [])]
+                table_name = table.get("name", "").lower()
+                description = table.get("description", "").lower()
+                columns = [col.lower() for col in table.get("columns", [])]
 
                 # Score based on keyword matches
                 for keyword in query_keywords:
@@ -349,10 +363,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                             score += 3
 
                 if score > 0:
-                    suggestions.append({
-                        **table,
-                        "relevance_score": score
-                    })
+                    suggestions.append({**table, "relevance_score": score})
 
             # Sort by relevance score and limit results
             suggestions.sort(key=lambda x: x["relevance_score"], reverse=True)
@@ -365,7 +376,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "query_intent": query_intent,
                 "platform": platform,
                 "host_id": host_id,
-                "message": f"Found {len(suggestions)} relevant tables for '{query_intent}'"
+                "message": f"Found {len(suggestions)} relevant tables for '{query_intent}'",
             }
 
         except Exception as e:
@@ -374,7 +385,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to suggest tables: {str(e)}",
                 "suggestions": [],
-                "count": 0
+                "count": 0,
             }
 
 
@@ -386,6 +397,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 # - Support for custom tables and extensions
 # - Platform-aware filtering
 # - Smart caching with 1-hour TTL
+
 
 async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
     """Get comprehensive osquery table information.
@@ -403,25 +415,75 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "pid", "name", "path", "cmdline", "state", "cwd", "root", "uid", "gid",
-                "euid", "egid", "suid", "sgid", "on_disk", "wired_size", "resident_size",
-                "total_size", "user_time", "system_time", "disk_bytes_read", "disk_bytes_written",
-                "start_time", "parent", "pgroup", "threads", "nice"
+                "pid",
+                "name",
+                "path",
+                "cmdline",
+                "state",
+                "cwd",
+                "root",
+                "uid",
+                "gid",
+                "euid",
+                "egid",
+                "suid",
+                "sgid",
+                "on_disk",
+                "wired_size",
+                "resident_size",
+                "total_size",
+                "user_time",
+                "system_time",
+                "disk_bytes_read",
+                "disk_bytes_written",
+                "start_time",
+                "parent",
+                "pgroup",
+                "threads",
+                "nice",
             ],
             "column_details": {
-                "pid": {"type": "bigint", "description": "Process (or thread) ID", "required": False},
-                "name": {"type": "text", "description": "The process name", "required": False},
-                "path": {"type": "text", "description": "Path to executed binary", "required": False},
-                "cmdline": {"type": "text", "description": "Complete argv", "required": False},
-                "state": {"type": "text", "description": "Process state", "required": False},
-                "uid": {"type": "bigint", "description": "Unsigned user ID", "required": False},
-                "gid": {"type": "bigint", "description": "Unsigned group ID", "required": False}
+                "pid": {
+                    "type": "bigint",
+                    "description": "Process (or thread) ID",
+                    "required": False,
+                },
+                "name": {
+                    "type": "text",
+                    "description": "The process name",
+                    "required": False,
+                },
+                "path": {
+                    "type": "text",
+                    "description": "Path to executed binary",
+                    "required": False,
+                },
+                "cmdline": {
+                    "type": "text",
+                    "description": "Complete argv",
+                    "required": False,
+                },
+                "state": {
+                    "type": "text",
+                    "description": "Process state",
+                    "required": False,
+                },
+                "uid": {
+                    "type": "bigint",
+                    "description": "Unsigned user ID",
+                    "required": False,
+                },
+                "gid": {
+                    "type": "bigint",
+                    "description": "Unsigned group ID",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT pid, name, cmdline FROM processes WHERE name = 'chrome';",
                 "SELECT * FROM processes WHERE pid = 1234;",
-                "SELECT name, COUNT(*) as count FROM processes GROUP BY name ORDER BY count DESC;"
-            ]
+                "SELECT name, COUNT(*) as count FROM processes GROUP BY name ORDER BY count DESC;",
+            ],
         },
         {
             "name": "users",
@@ -429,21 +491,47 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows", "chrome"],
             "evented": False,
             "columns": [
-                "uid", "gid", "uid_signed", "gid_signed", "username", "description",
-                "directory", "shell", "uuid", "type", "is_hidden", "pid_with_namespace"
+                "uid",
+                "gid",
+                "uid_signed",
+                "gid_signed",
+                "username",
+                "description",
+                "directory",
+                "shell",
+                "uuid",
+                "type",
+                "is_hidden",
+                "pid_with_namespace",
             ],
             "column_details": {
                 "uid": {"type": "bigint", "description": "User ID", "required": False},
-                "username": {"type": "text", "description": "Username", "required": False},
-                "description": {"type": "text", "description": "Optional user description", "required": False},
-                "directory": {"type": "text", "description": "User's home directory", "required": False},
-                "shell": {"type": "text", "description": "User's configured default shell", "required": False}
+                "username": {
+                    "type": "text",
+                    "description": "Username",
+                    "required": False,
+                },
+                "description": {
+                    "type": "text",
+                    "description": "Optional user description",
+                    "required": False,
+                },
+                "directory": {
+                    "type": "text",
+                    "description": "User's home directory",
+                    "required": False,
+                },
+                "shell": {
+                    "type": "text",
+                    "description": "User's configured default shell",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT uid, username, description FROM users;",
                 "SELECT * FROM users WHERE username = 'admin';",
-                "SELECT username, directory, shell FROM users WHERE uid >= 1000;"
-            ]
+                "SELECT username, directory, shell FROM users WHERE uid >= 1000;",
+            ],
         },
         {
             "name": "file",
@@ -451,23 +539,62 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "path", "directory", "filename", "inode", "uid", "gid", "mode", "device",
-                "size", "block_size", "atime", "mtime", "ctime", "btime", "hard_links",
-                "symlink", "type", "attributes", "volume_serial", "file_id", "file_version",
-                "product_version", "original_filename"
+                "path",
+                "directory",
+                "filename",
+                "inode",
+                "uid",
+                "gid",
+                "mode",
+                "device",
+                "size",
+                "block_size",
+                "atime",
+                "mtime",
+                "ctime",
+                "btime",
+                "hard_links",
+                "symlink",
+                "type",
+                "attributes",
+                "volume_serial",
+                "file_id",
+                "file_version",
+                "product_version",
+                "original_filename",
             ],
             "column_details": {
-                "path": {"type": "text", "description": "Absolute file path", "required": True},
-                "filename": {"type": "text", "description": "Name portion of file path", "required": False},
-                "size": {"type": "bigint", "description": "Size of file in bytes", "required": False},
-                "mtime": {"type": "bigint", "description": "Last modification time", "required": False},
-                "type": {"type": "text", "description": "File type (regular, directory, etc.)", "required": False}
+                "path": {
+                    "type": "text",
+                    "description": "Absolute file path",
+                    "required": True,
+                },
+                "filename": {
+                    "type": "text",
+                    "description": "Name portion of file path",
+                    "required": False,
+                },
+                "size": {
+                    "type": "bigint",
+                    "description": "Size of file in bytes",
+                    "required": False,
+                },
+                "mtime": {
+                    "type": "bigint",
+                    "description": "Last modification time",
+                    "required": False,
+                },
+                "type": {
+                    "type": "text",
+                    "description": "File type (regular, directory, etc.)",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT * FROM file WHERE path = '/etc/passwd';",
                 "SELECT path, size, mtime FROM file WHERE path LIKE '/tmp/%';",
-                "SELECT filename, size FROM file WHERE directory = '/Applications';"
-            ]
+                "SELECT filename, size FROM file WHERE directory = '/Applications';",
+            ],
         },
         {
             "name": "network_interfaces",
@@ -475,26 +602,73 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "interface", "mac", "ip_address", "mask", "broadcast", "point_to_point",
-                "type", "mtu", "metric", "flags", "ipackets", "opackets", "ibytes",
-                "obytes", "ierrors", "oerrors", "idrops", "odrops", "collisions",
-                "last_change", "link_speed", "pci_slot", "friendly_name", "description",
-                "manufacturer", "connection_id", "connection_status", "enabled", "physical_adapter",
-                "speed", "service", "dhcp_enabled", "dhcp_lease_expires", "dhcp_lease_obtained",
-                "dhcp_server", "dns_domain", "dns_domain_suffix_search_order", "dns_host_name",
-                "dns_server_search_order"
+                "interface",
+                "mac",
+                "ip_address",
+                "mask",
+                "broadcast",
+                "point_to_point",
+                "type",
+                "mtu",
+                "metric",
+                "flags",
+                "ipackets",
+                "opackets",
+                "ibytes",
+                "obytes",
+                "ierrors",
+                "oerrors",
+                "idrops",
+                "odrops",
+                "collisions",
+                "last_change",
+                "link_speed",
+                "pci_slot",
+                "friendly_name",
+                "description",
+                "manufacturer",
+                "connection_id",
+                "connection_status",
+                "enabled",
+                "physical_adapter",
+                "speed",
+                "service",
+                "dhcp_enabled",
+                "dhcp_lease_expires",
+                "dhcp_lease_obtained",
+                "dhcp_server",
+                "dns_domain",
+                "dns_domain_suffix_search_order",
+                "dns_host_name",
+                "dns_server_search_order",
             ],
             "column_details": {
-                "interface": {"type": "text", "description": "Interface name", "required": False},
-                "mac": {"type": "text", "description": "MAC address", "required": False},
-                "ip_address": {"type": "text", "description": "IP address", "required": False},
-                "type": {"type": "integer", "description": "Interface type", "required": False}
+                "interface": {
+                    "type": "text",
+                    "description": "Interface name",
+                    "required": False,
+                },
+                "mac": {
+                    "type": "text",
+                    "description": "MAC address",
+                    "required": False,
+                },
+                "ip_address": {
+                    "type": "text",
+                    "description": "IP address",
+                    "required": False,
+                },
+                "type": {
+                    "type": "integer",
+                    "description": "Interface type",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT interface, mac, ip_address FROM network_interfaces;",
                 "SELECT * FROM network_interfaces WHERE ip_address != '';",
-                "SELECT interface, type, enabled FROM network_interfaces WHERE enabled = 1;"
-            ]
+                "SELECT interface, type, enabled FROM network_interfaces WHERE enabled = 1;",
+            ],
         },
         {
             "name": "listening_ports",
@@ -502,19 +676,43 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "pid", "port", "protocol", "family", "address", "fd", "socket", "path", "net_namespace"
+                "pid",
+                "port",
+                "protocol",
+                "family",
+                "address",
+                "fd",
+                "socket",
+                "path",
+                "net_namespace",
             ],
             "column_details": {
-                "pid": {"type": "integer", "description": "Process (or thread) ID", "required": False},
-                "port": {"type": "integer", "description": "Transport layer port", "required": False},
-                "protocol": {"type": "integer", "description": "Transport protocol (TCP/UDP)", "required": False},
-                "address": {"type": "text", "description": "Specific address for bind", "required": False}
+                "pid": {
+                    "type": "integer",
+                    "description": "Process (or thread) ID",
+                    "required": False,
+                },
+                "port": {
+                    "type": "integer",
+                    "description": "Transport layer port",
+                    "required": False,
+                },
+                "protocol": {
+                    "type": "integer",
+                    "description": "Transport protocol (TCP/UDP)",
+                    "required": False,
+                },
+                "address": {
+                    "type": "text",
+                    "description": "Specific address for bind",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT pid, port, protocol, address FROM listening_ports;",
                 "SELECT * FROM listening_ports WHERE port = 80;",
-                "SELECT p.name, lp.port, lp.address FROM listening_ports lp JOIN processes p ON lp.pid = p.pid;"
-            ]
+                "SELECT p.name, lp.port, lp.address FROM listening_ports lp JOIN processes p ON lp.pid = p.pid;",
+            ],
         },
         {
             "name": "system_info",
@@ -522,22 +720,50 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "hostname", "uuid", "cpu_type", "cpu_subtype", "cpu_brand", "cpu_physical_cores",
-                "cpu_logical_cores", "cpu_microcode", "physical_memory", "hardware_vendor",
-                "hardware_model", "hardware_version", "hardware_serial", "computer_name",
-                "local_hostname", "cpu_sockets"
+                "hostname",
+                "uuid",
+                "cpu_type",
+                "cpu_subtype",
+                "cpu_brand",
+                "cpu_physical_cores",
+                "cpu_logical_cores",
+                "cpu_microcode",
+                "physical_memory",
+                "hardware_vendor",
+                "hardware_model",
+                "hardware_version",
+                "hardware_serial",
+                "computer_name",
+                "local_hostname",
+                "cpu_sockets",
             ],
             "column_details": {
-                "hostname": {"type": "text", "description": "Network hostname", "required": False},
-                "cpu_brand": {"type": "text", "description": "CPU brand string", "required": False},
-                "physical_memory": {"type": "bigint", "description": "Total physical memory in bytes", "required": False},
-                "hardware_vendor": {"type": "text", "description": "Hardware vendor", "required": False}
+                "hostname": {
+                    "type": "text",
+                    "description": "Network hostname",
+                    "required": False,
+                },
+                "cpu_brand": {
+                    "type": "text",
+                    "description": "CPU brand string",
+                    "required": False,
+                },
+                "physical_memory": {
+                    "type": "bigint",
+                    "description": "Total physical memory in bytes",
+                    "required": False,
+                },
+                "hardware_vendor": {
+                    "type": "text",
+                    "description": "Hardware vendor",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT hostname, cpu_brand, physical_memory FROM system_info;",
                 "SELECT * FROM system_info;",
-                "SELECT hardware_vendor, hardware_model FROM system_info;"
-            ]
+                "SELECT hardware_vendor, hardware_model FROM system_info;",
+            ],
         },
         {
             "name": "os_version",
@@ -545,20 +771,46 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "name", "version", "major", "minor", "patch", "build", "platform", "platform_like",
-                "codename", "arch", "install_date", "pid_with_namespace"
+                "name",
+                "version",
+                "major",
+                "minor",
+                "patch",
+                "build",
+                "platform",
+                "platform_like",
+                "codename",
+                "arch",
+                "install_date",
+                "pid_with_namespace",
             ],
             "column_details": {
-                "name": {"type": "text", "description": "Distribution or product name", "required": False},
-                "version": {"type": "text", "description": "Pretty, suitable for presentation, OS version", "required": False},
-                "platform": {"type": "text", "description": "OS Platform or ID", "required": False},
-                "arch": {"type": "text", "description": "OS Architecture", "required": False}
+                "name": {
+                    "type": "text",
+                    "description": "Distribution or product name",
+                    "required": False,
+                },
+                "version": {
+                    "type": "text",
+                    "description": "Pretty, suitable for presentation, OS version",
+                    "required": False,
+                },
+                "platform": {
+                    "type": "text",
+                    "description": "OS Platform or ID",
+                    "required": False,
+                },
+                "arch": {
+                    "type": "text",
+                    "description": "OS Architecture",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT name, version, platform, arch FROM os_version;",
                 "SELECT * FROM os_version;",
-                "SELECT name, major, minor, patch FROM os_version;"
-            ]
+                "SELECT name, major, minor, patch FROM os_version;",
+            ],
         },
         {
             "name": "installed_applications",
@@ -566,22 +818,52 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin"],
             "evented": False,
             "columns": [
-                "name", "path", "bundle_executable", "bundle_identifier", "bundle_name",
-                "bundle_short_version", "bundle_version", "bundle_package_type", "environment",
-                "element", "compiler", "development_region", "display_name", "info_string",
-                "minimum_system_version", "category", "applescript_enabled", "copyright"
+                "name",
+                "path",
+                "bundle_executable",
+                "bundle_identifier",
+                "bundle_name",
+                "bundle_short_version",
+                "bundle_version",
+                "bundle_package_type",
+                "environment",
+                "element",
+                "compiler",
+                "development_region",
+                "display_name",
+                "info_string",
+                "minimum_system_version",
+                "category",
+                "applescript_enabled",
+                "copyright",
             ],
             "column_details": {
-                "name": {"type": "text", "description": "Name of the application", "required": False},
-                "path": {"type": "text", "description": "Path to application bundle", "required": False},
-                "bundle_identifier": {"type": "text", "description": "Application bundle identifier", "required": False},
-                "bundle_version": {"type": "text", "description": "Application bundle version", "required": False}
+                "name": {
+                    "type": "text",
+                    "description": "Name of the application",
+                    "required": False,
+                },
+                "path": {
+                    "type": "text",
+                    "description": "Path to application bundle",
+                    "required": False,
+                },
+                "bundle_identifier": {
+                    "type": "text",
+                    "description": "Application bundle identifier",
+                    "required": False,
+                },
+                "bundle_version": {
+                    "type": "text",
+                    "description": "Application bundle version",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT name, bundle_identifier, bundle_version FROM installed_applications;",
                 "SELECT * FROM installed_applications WHERE name LIKE '%Chrome%';",
-                "SELECT name, path FROM installed_applications ORDER BY name;"
-            ]
+                "SELECT name, path FROM installed_applications ORDER BY name;",
+            ],
         },
         {
             "name": "programs",
@@ -589,20 +871,43 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["windows"],
             "evented": False,
             "columns": [
-                "name", "version", "install_location", "install_source", "language", "publisher",
-                "uninstall_string", "install_date", "identifying_number"
+                "name",
+                "version",
+                "install_location",
+                "install_source",
+                "language",
+                "publisher",
+                "uninstall_string",
+                "install_date",
+                "identifying_number",
             ],
             "column_details": {
-                "name": {"type": "text", "description": "Commonly used product name", "required": False},
-                "version": {"type": "text", "description": "Product version information", "required": False},
-                "publisher": {"type": "text", "description": "Name of the product supplier", "required": False},
-                "install_date": {"type": "text", "description": "Date that this product was installed", "required": False}
+                "name": {
+                    "type": "text",
+                    "description": "Commonly used product name",
+                    "required": False,
+                },
+                "version": {
+                    "type": "text",
+                    "description": "Product version information",
+                    "required": False,
+                },
+                "publisher": {
+                    "type": "text",
+                    "description": "Name of the product supplier",
+                    "required": False,
+                },
+                "install_date": {
+                    "type": "text",
+                    "description": "Date that this product was installed",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT name, version, publisher FROM programs;",
                 "SELECT * FROM programs WHERE name LIKE '%Microsoft%';",
-                "SELECT name, install_date FROM programs ORDER BY install_date DESC;"
-            ]
+                "SELECT name, install_date FROM programs ORDER BY install_date DESC;",
+            ],
         },
         {
             "name": "deb_packages",
@@ -610,40 +915,80 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["linux"],
             "evented": False,
             "columns": [
-                "name", "version", "source", "size", "arch", "revision", "status", "maintainer",
-                "section", "priority", "admindir", "pid_with_namespace"
+                "name",
+                "version",
+                "source",
+                "size",
+                "arch",
+                "revision",
+                "status",
+                "maintainer",
+                "section",
+                "priority",
+                "admindir",
+                "pid_with_namespace",
             ],
             "column_details": {
-                "name": {"type": "text", "description": "Package name", "required": False},
-                "version": {"type": "text", "description": "Package version", "required": False},
-                "status": {"type": "text", "description": "Package status", "required": False},
-                "maintainer": {"type": "text", "description": "Package maintainer", "required": False}
+                "name": {
+                    "type": "text",
+                    "description": "Package name",
+                    "required": False,
+                },
+                "version": {
+                    "type": "text",
+                    "description": "Package version",
+                    "required": False,
+                },
+                "status": {
+                    "type": "text",
+                    "description": "Package status",
+                    "required": False,
+                },
+                "maintainer": {
+                    "type": "text",
+                    "description": "Package maintainer",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT name, version, status FROM deb_packages;",
                 "SELECT * FROM deb_packages WHERE name = 'openssh-server';",
-                "SELECT name, maintainer FROM deb_packages WHERE status = 'install ok installed';"
-            ]
+                "SELECT name, maintainer FROM deb_packages WHERE status = 'install ok installed';",
+            ],
         },
         {
             "name": "startup_items",
             "description": "Applications and binaries set as user/login startup items",
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
-            "columns": [
-                "name", "path", "args", "type", "source", "status", "username"
-            ],
+            "columns": ["name", "path", "args", "type", "source", "status", "username"],
             "column_details": {
-                "name": {"type": "text", "description": "Name of startup item", "required": False},
-                "path": {"type": "text", "description": "Path of startup executable", "required": False},
-                "type": {"type": "text", "description": "Startup Item or Login Item", "required": False},
-                "status": {"type": "text", "description": "Startup status; either enabled or disabled", "required": False}
+                "name": {
+                    "type": "text",
+                    "description": "Name of startup item",
+                    "required": False,
+                },
+                "path": {
+                    "type": "text",
+                    "description": "Path of startup executable",
+                    "required": False,
+                },
+                "type": {
+                    "type": "text",
+                    "description": "Startup Item or Login Item",
+                    "required": False,
+                },
+                "status": {
+                    "type": "text",
+                    "description": "Startup status; either enabled or disabled",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT name, path, status FROM startup_items;",
                 "SELECT * FROM startup_items WHERE status = 'enabled';",
-                "SELECT name, type, username FROM startup_items;"
-            ]
+                "SELECT name, type, username FROM startup_items;",
+            ],
         },
         {
             "name": "logged_in_users",
@@ -651,19 +996,42 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "type", "user", "tty", "host", "time", "pid", "sid", "registry_hive"
+                "type",
+                "user",
+                "tty",
+                "host",
+                "time",
+                "pid",
+                "sid",
+                "registry_hive",
             ],
             "column_details": {
-                "user": {"type": "text", "description": "User login name", "required": False},
-                "tty": {"type": "text", "description": "Device name", "required": False},
-                "host": {"type": "text", "description": "Remote hostname", "required": False},
-                "time": {"type": "integer", "description": "Time entry was made", "required": False}
+                "user": {
+                    "type": "text",
+                    "description": "User login name",
+                    "required": False,
+                },
+                "tty": {
+                    "type": "text",
+                    "description": "Device name",
+                    "required": False,
+                },
+                "host": {
+                    "type": "text",
+                    "description": "Remote hostname",
+                    "required": False,
+                },
+                "time": {
+                    "type": "integer",
+                    "description": "Time entry was made",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT user, tty, host, time FROM logged_in_users;",
                 "SELECT * FROM logged_in_users;",
-                "SELECT user, COUNT(*) as sessions FROM logged_in_users GROUP BY user;"
-            ]
+                "SELECT user, COUNT(*) as sessions FROM logged_in_users GROUP BY user;",
+            ],
         },
         {
             "name": "hash",
@@ -671,19 +1039,41 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux", "windows"],
             "evented": False,
             "columns": [
-                "path", "directory", "md5", "sha1", "sha256", "ssdeep", "pid_with_namespace"
+                "path",
+                "directory",
+                "md5",
+                "sha1",
+                "sha256",
+                "ssdeep",
+                "pid_with_namespace",
             ],
             "column_details": {
-                "path": {"type": "text", "description": "Must provide a path or directory", "required": True},
-                "md5": {"type": "text", "description": "MD5 hash of provided filesystem data", "required": False},
-                "sha1": {"type": "text", "description": "SHA1 hash of provided filesystem data", "required": False},
-                "sha256": {"type": "text", "description": "SHA256 hash of provided filesystem data", "required": False}
+                "path": {
+                    "type": "text",
+                    "description": "Must provide a path or directory",
+                    "required": True,
+                },
+                "md5": {
+                    "type": "text",
+                    "description": "MD5 hash of provided filesystem data",
+                    "required": False,
+                },
+                "sha1": {
+                    "type": "text",
+                    "description": "SHA1 hash of provided filesystem data",
+                    "required": False,
+                },
+                "sha256": {
+                    "type": "text",
+                    "description": "SHA256 hash of provided filesystem data",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT path, md5, sha256 FROM hash WHERE path = '/bin/ls';",
                 "SELECT * FROM hash WHERE directory = '/usr/bin';",
-                "SELECT path, sha1 FROM hash WHERE path LIKE '/etc/%';"
-            ]
+                "SELECT path, sha1 FROM hash WHERE path LIKE '/etc/%';",
+            ],
         },
         {
             "name": "process_events",
@@ -691,21 +1081,61 @@ async def _get_osquery_tables_legacy() -> list[dict[str, Any]]:
             "platforms": ["darwin", "linux"],
             "evented": True,
             "columns": [
-                "pid", "path", "mode", "cmdline", "cmdline_size", "env", "env_count", "env_size",
-                "cwd", "auid", "uid", "euid", "gid", "egid", "owner_uid", "owner_gid", "atime",
-                "mtime", "ctime", "btime", "overflows", "parent", "time", "uptime", "eid",
-                "status", "syscall", "exit_code"
+                "pid",
+                "path",
+                "mode",
+                "cmdline",
+                "cmdline_size",
+                "env",
+                "env_count",
+                "env_size",
+                "cwd",
+                "auid",
+                "uid",
+                "euid",
+                "gid",
+                "egid",
+                "owner_uid",
+                "owner_gid",
+                "atime",
+                "mtime",
+                "ctime",
+                "btime",
+                "overflows",
+                "parent",
+                "time",
+                "uptime",
+                "eid",
+                "status",
+                "syscall",
+                "exit_code",
             ],
             "column_details": {
-                "pid": {"type": "bigint", "description": "Process (or thread) ID", "required": False},
-                "path": {"type": "text", "description": "Path of executed file", "required": False},
-                "cmdline": {"type": "text", "description": "Command line arguments", "required": False},
-                "time": {"type": "bigint", "description": "Time of execution in UNIX time", "required": False}
+                "pid": {
+                    "type": "bigint",
+                    "description": "Process (or thread) ID",
+                    "required": False,
+                },
+                "path": {
+                    "type": "text",
+                    "description": "Path of executed file",
+                    "required": False,
+                },
+                "cmdline": {
+                    "type": "text",
+                    "description": "Command line arguments",
+                    "required": False,
+                },
+                "time": {
+                    "type": "bigint",
+                    "description": "Time of execution in UNIX time",
+                    "required": False,
+                },
             },
             "examples": [
                 "SELECT pid, path, cmdline, time FROM process_events WHERE time > (strftime('%s', 'now') - 3600);",
                 "SELECT * FROM process_events WHERE path LIKE '%bash%';",
-                "SELECT path, COUNT(*) as executions FROM process_events GROUP BY path ORDER BY executions DESC;"
-            ]
-        }
+                "SELECT path, COUNT(*) as executions FROM process_events GROUP BY path ORDER BY executions DESC;",
+            ],
+        },
     ]

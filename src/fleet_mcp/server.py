@@ -7,8 +7,15 @@ from mcp.server.fastmcp import FastMCP
 
 from .client import FleetClient
 from .config import FleetConfig, get_default_config_file, load_config
-from .tools import host_tools, policy_tools, query_tools, software_tools, table_tools, team_tools
-from .tools import query_tools_readonly
+from .tools import (
+    host_tools,
+    policy_tools,
+    query_tools,
+    query_tools_readonly,
+    software_tools,
+    table_tools,
+    team_tools,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +25,7 @@ class FleetMCPServer:
 
     def __init__(self, config: FleetConfig | None = None):
         """Initialize Fleet MCP Server.
-        
+
         Args:
             config: Optional Fleet configuration. If not provided, will load from environment/file.
         """
@@ -33,7 +40,7 @@ class FleetMCPServer:
         readonly_note = self._get_readonly_note()
         self.mcp = FastMCP(
             name=f"Fleet DM Server{readonly_note}",
-            instructions=self._get_server_instructions()
+            instructions=self._get_server_instructions(),
         )
 
         # Register all tool categories
@@ -106,8 +113,12 @@ class FleetMCPServer:
         host_tools.register_read_tools(self.mcp, self.client)
         query_tools.register_read_tools(self.mcp, self.client)
         policy_tools.register_read_tools(self.mcp, self.client)
-        software_tools.register_tools(self.mcp, self.client)  # Software tools are all read-only
-        table_tools.register_tools(self.mcp, self.client)  # Table tools are all read-only
+        software_tools.register_tools(
+            self.mcp, self.client
+        )  # Software tools are all read-only
+        table_tools.register_tools(
+            self.mcp, self.client
+        )  # Table tools are all read-only
         team_tools.register_read_tools(self.mcp, self.client)
 
         # Register SELECT-only query tools if in readonly mode with allow_select_queries
@@ -130,7 +141,7 @@ class FleetMCPServer:
         @self.mcp.tool()
         async def fleet_health_check() -> dict[str, Any]:
             """Check Fleet server connectivity and authentication.
-            
+
             Returns:
                 Dict containing health check results and server information.
             """
@@ -143,7 +154,7 @@ class FleetMCPServer:
                         "message": response.message,
                         "server_url": self.config.server_url,
                         "status": "healthy" if response.success else "unhealthy",
-                        "details": response.data or {}
+                        "details": response.data or {},
                     }
 
             except Exception as e:
@@ -152,7 +163,7 @@ class FleetMCPServer:
                     "success": False,
                     "message": f"Health check failed: {str(e)}",
                     "server_url": self.config.server_url,
-                    "status": "error"
+                    "status": "error",
                 }
 
     def run(self) -> None:
@@ -163,10 +174,10 @@ class FleetMCPServer:
 
 def create_server(config: FleetConfig | None = None) -> FleetMCPServer:
     """Create and configure Fleet MCP Server.
-    
+
     Args:
         config: Optional Fleet configuration
-        
+
     Returns:
         Configured FleetMCPServer instance
     """
@@ -178,7 +189,7 @@ def main() -> None:
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     try:

@@ -35,17 +35,17 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         per_page: int = 100,
         order_key: str = "name",
         order_direction: str = "asc",
-        team_id: int | None = None
+        team_id: int | None = None,
     ) -> dict[str, Any]:
         """List all saved queries in Fleet.
-        
+
         Args:
             page: Page number for pagination (0-based)
             per_page: Number of queries per page
             order_key: Field to order by (name, updated_at, created_at)
             order_direction: Sort direction (asc, desc)
             team_id: Filter queries by team ID
-            
+
         Returns:
             Dict containing list of queries and pagination metadata.
         """
@@ -55,7 +55,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "page": page,
                     "per_page": per_page,
                     "order_key": order_key,
-                    "order_direction": order_direction
+                    "order_direction": order_direction,
                 }
 
                 if team_id is not None:
@@ -71,14 +71,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "count": len(queries),
                         "page": page,
                         "per_page": per_page,
-                        "message": f"Found {len(queries)} queries"
+                        "message": f"Found {len(queries)} queries",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "queries": [],
-                        "count": 0
+                        "count": 0,
                     }
 
         except FleetAPIError as e:
@@ -87,13 +87,13 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to list queries: {str(e)}",
                 "queries": [],
-                "count": 0
+                "count": 0,
             }
 
-
-
     @mcp.tool()
-    async def fleet_get_query_report(query_id: int, team_id: int | None = None) -> dict[str, Any]:
+    async def fleet_get_query_report(
+        query_id: int, team_id: int | None = None
+    ) -> dict[str, Any]:
         """Get the latest results from a scheduled query.
 
         This retrieves the stored results from the last time a scheduled query ran.
@@ -112,7 +112,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 if team_id is not None:
                     params["team_id"] = team_id
 
-                response = await client.get(f"/queries/{query_id}/report", params=params)
+                response = await client.get(
+                    f"/queries/{query_id}/report", params=params
+                )
 
                 if response.success and response.data:
                     results = response.data.get("results", [])
@@ -123,8 +125,8 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "results": results,
                         "result_count": len(results),
                         "report_clipped": report_clipped,
-                        "message": f"Retrieved {len(results)} query results" +
-                                   (" (report clipped)" if report_clipped else "")
+                        "message": f"Retrieved {len(results)} query results"
+                        + (" (report clipped)" if report_clipped else ""),
                     }
                 else:
                     return {
@@ -132,7 +134,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "message": response.message,
                         "results": [],
                         "query_id": query_id,
-                        "result_count": 0
+                        "result_count": 0,
                     }
 
         except FleetAPIError as e:
@@ -142,16 +144,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to get query report: {str(e)}",
                 "results": [],
                 "query_id": query_id,
-                "result_count": 0
+                "result_count": 0,
             }
 
     @mcp.tool()
     async def fleet_get_query(query_id: int) -> dict[str, Any]:
         """Get details of a specific saved query.
-        
+
         Args:
             query_id: ID of the query to retrieve
-            
+
         Returns:
             Dict containing query details.
         """
@@ -165,14 +167,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "success": True,
                         "query": query_data,
                         "query_id": query_id,
-                        "message": f"Retrieved query '{query_data.get('name', query_id)}'"
+                        "message": f"Retrieved query '{query_data.get('name', query_id)}'",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "query": None,
-                        "query_id": query_id
+                        "query_id": query_id,
                     }
 
         except FleetAPIError as e:
@@ -181,7 +183,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to get query: {str(e)}",
                 "query": None,
-                "query_id": query_id
+                "query_id": query_id,
             }
 
 
@@ -199,7 +201,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         query: str,
         description: str | None = None,
         team_id: int | None = None,
-        observer_can_run: bool = False
+        observer_can_run: bool = False,
     ) -> dict[str, Any]:
         """Create a new saved query in Fleet.
 
@@ -218,7 +220,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 json_data = {
                     "name": name,
                     "query": query,
-                    "observer_can_run": observer_can_run
+                    "observer_can_run": observer_can_run,
                 }
 
                 if description:
@@ -234,13 +236,13 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     return {
                         "success": True,
                         "query": query_data,
-                        "message": f"Created query '{name}' with ID {query_data.get('id')}"
+                        "message": f"Created query '{name}' with ID {query_data.get('id')}",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
-                        "query": None
+                        "query": None,
                     }
 
         except FleetAPIError as e:
@@ -248,7 +250,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to create query: {str(e)}",
-                "query": None
+                "query": None,
             }
 
     @mcp.tool()
@@ -256,7 +258,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         query: str,
         host_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
-        team_ids: list[int] | None = None
+        team_ids: list[int] | None = None,
     ) -> dict[str, Any]:
         """Execute a live query against specified hosts.
 
@@ -290,14 +292,14 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "campaign": campaign,
                         "campaign_id": campaign.get("id"),
                         "query": query,
-                        "message": f"Started live query campaign {campaign.get('id')}"
+                        "message": f"Started live query campaign {campaign.get('id')}",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "campaign": None,
-                        "query": query
+                        "query": query,
                     }
 
         except FleetAPIError as e:
@@ -306,7 +308,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to run live query: {str(e)}",
                 "campaign": None,
-                "query": query
+                "query": query,
             }
 
     @mcp.tool()
@@ -326,8 +328,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 return {
                     "success": response.success,
-                    "message": response.message or f"Query {query_id} deleted successfully",
-                    "query_id": query_id
+                    "message": response.message
+                    or f"Query {query_id} deleted successfully",
+                    "query_id": query_id,
                 }
 
         except FleetAPIError as e:
@@ -335,7 +338,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to delete query: {str(e)}",
-                "query_id": query_id
+                "query_id": query_id,
             }
 
     @mcp.tool()
@@ -343,7 +346,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         query_id: int,
         host_ids: list[int] | None = None,
         label_ids: list[int] | None = None,
-        team_ids: list[int] | None = None
+        team_ids: list[int] | None = None,
     ) -> dict[str, Any]:
         """Run a saved query against specified hosts.
 
@@ -364,8 +367,8 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "selected": {
                         "hosts": host_ids or [],
                         "labels": label_ids or [],
-                        "teams": team_ids or []
-                    }
+                        "teams": team_ids or [],
+                    },
                 }
 
                 response = await client.post("/queries/run", json_data=json_data)
@@ -377,14 +380,14 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "campaign": campaign,
                         "campaign_id": campaign.get("id"),
                         "query_id": query_id,
-                        "message": f"Started saved query campaign {campaign.get('id')}"
+                        "message": f"Started saved query campaign {campaign.get('id')}",
                     }
                 else:
                     return {
                         "success": False,
                         "message": response.message,
                         "campaign": None,
-                        "query_id": query_id
+                        "query_id": query_id,
                     }
 
         except FleetAPIError as e:
@@ -393,5 +396,5 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to run saved query: {str(e)}",
                 "campaign": None,
-                "query_id": query_id
+                "query_id": query_id,
             }
