@@ -10,6 +10,36 @@ from pydantic import ValidationError
 from fleet_mcp.config import FleetConfig, load_config
 
 
+@pytest.fixture(autouse=True)
+def isolate_env_vars():
+    """Isolate tests from .env file by clearing Fleet-related env vars.
+
+    This ensures unit tests aren't affected by the .env file in the project root.
+    """
+    # Save original values
+    original_env = {}
+    fleet_vars = [
+        "FLEET_SERVER_URL",
+        "FLEET_API_TOKEN",
+        "FLEET_VERIFY_SSL",
+        "FLEET_TIMEOUT",
+        "FLEET_MAX_RETRIES",
+        "FLEET_READONLY",
+        "FLEET_ALLOW_SELECT_QUERIES",
+    ]
+
+    for var in fleet_vars:
+        if var in os.environ:
+            original_env[var] = os.environ[var]
+            del os.environ[var]
+
+    yield
+
+    # Restore original values
+    for var, value in original_env.items():
+        os.environ[var] = value
+
+
 class TestFleetConfig:
     """Test FleetConfig validation and loading."""
 

@@ -49,18 +49,25 @@ def live_fleet_config():
     This should be configured with actual Fleet server credentials.
     Default to readonly mode for safety in tests.
 
-    Note: Update the server_url and api_token for your environment,
-    or use environment variables.
+    Reads from environment variables or .env file via pydantic-settings.
     """
     import os
 
+    from dotenv import load_dotenv
+
+    # Load .env file explicitly for tests
+    load_dotenv()
+
+    # Now create config from environment variables
     return FleetConfig(
         server_url=os.getenv("FLEET_SERVER_URL", "http://192.168.68.125:1337"),
         api_token=os.getenv(
             "FLEET_API_TOKEN",
             "+nHwmPaf7wSt9sg8qvNX0/LDL26TdM6wxXYD/4W9tfzmNeq+5GWBzmR15Oq6GpMgGzkLpPcH3vq4i9pXi/+lLw==",
         ),
-        readonly=True,
+        readonly=os.getenv("FLEET_READONLY", "true").lower() in ("true", "1", "yes"),
+        verify_ssl=os.getenv("FLEET_VERIFY_SSL", "true").lower()
+        in ("true", "1", "yes"),
     )
 
 
