@@ -10,6 +10,143 @@ from ..client import FleetAPIError, FleetClient, FleetValidationError
 logger = logging.getLogger(__name__)
 
 
+def extract_error_details(error: FleetAPIError) -> str:
+    """Extract detailed error information from API error response.
+
+    Attempts to extract specific error details from the response data
+    to provide more actionable error messages to users.
+
+    Args:
+        error: FleetAPIError or subclass with response_data
+
+    Returns:
+        Detailed error message string
+    """
+    # Start with the base error message
+    base_message = str(error)
+
+    # If no response data, return base message
+    if not error.response_data:
+        return base_message
+
+    response_data = error.response_data
+
+    # Try to extract specific error details from common API response formats
+    details = []
+
+    # Check for "errors" array (common in validation responses)
+    if isinstance(response_data.get("errors"), list):
+        for error_item in response_data["errors"]:
+            if isinstance(error_item, dict):
+                # Try different error field names
+                if "message" in error_item:
+                    details.append(error_item["message"])
+                elif "detail" in error_item:
+                    details.append(error_item["detail"])
+                elif "error" in error_item:
+                    details.append(error_item["error"])
+            elif isinstance(error_item, str):
+                details.append(error_item)
+
+    # Check for single "error" field
+    if "error" in response_data and isinstance(response_data["error"], str):
+        details.append(response_data["error"])
+
+    # Check for "message" field (different from the base message)
+    if "message" in response_data and isinstance(response_data["message"], str):
+        api_message = response_data["message"]
+        if api_message and api_message not in base_message:
+            details.append(api_message)
+
+    # Check for "details" field
+    if "details" in response_data and isinstance(response_data["details"], str):
+        details.append(response_data["details"])
+
+    # Check for specific validation error patterns
+    if "validation_failed" in response_data:
+        details.append("Validation failed - check your input parameters")
+
+    # If we found specific details, combine them with the base message
+    if details:
+        unique_details = []
+        seen = set()
+        for detail in details:
+            if detail and detail not in seen:
+                unique_details.append(detail)
+                seen.add(detail)
+
+        if unique_details:
+            return f"{base_message}: {'; '.join(unique_details)}"
+
+    return base_message
+
+
+async def validate_script_host_team_compatibility(
+    client: FleetClient, script_id: int, host_id: int
+) -> tuple[bool, str | None]:
+    """Validate that script and host are in compatible teams.
+
+    Checks team compatibility before attempting script execution:
+    - If script has team_id=None (global), it's available to all hosts
+    - If host has team_id=None (no team), it can only run global scripts
+    - If both have team IDs, they must match exactly
+
+    Args:
+        client: Fleet API client
+        script_id: ID of the script to run
+        host_id: ID of the host to run on
+
+    Returns:
+        Tuple of (is_compatible, error_message)
+        - is_compatible: True if teams are compatible, False otherwise
+        - error_message: None if compatible, error message if not
+    """
+    try:
+        # Fetch script details
+        script_response = await client.get(f"/api/v1/fleet/scripts/{script_id}")
+        if not script_response.success or not script_response.data:
+            return False, f"Script {script_id} not found or inaccessible"
+
+        script = script_response.data.get("script", script_response.data)
+        script_team_id = script.get("team_id")
+
+        # Fetch host details
+        host_response = await client.get(f"/hosts/{host_id}")
+        if not host_response.success or not host_response.data:
+            return False, f"Host {host_id} not found or inaccessible"
+
+        host = host_response.data.get("host", {})
+        host_team_id = host.get("team_id")
+
+        # Validate team compatibility
+        if script_team_id is None:
+            # Global script - available to all hosts
+            return True, None
+        elif host_team_id is None:
+            # Host has no team - can only run global scripts
+            return (
+                False,
+                f"Cannot run script: Script {script_id} is assigned to team {script_team_id} "
+                f"but host {host_id} has no team assignment. "
+                f"Scripts can only be run on hosts in the same team.",
+            )
+        elif script_team_id != host_team_id:
+            # Team mismatch
+            return (
+                False,
+                f"Cannot run script: Script {script_id} is assigned to team {script_team_id} "
+                f"but host {host_id} is in team {host_team_id}. "
+                f"Scripts can only be run on hosts in the same team.",
+            )
+        else:
+            # Teams match
+            return True, None
+
+    except FleetAPIError as e:
+        logger.error(f"Failed to validate team compatibility for script {script_id} and host {host_id}: {e}")
+        return False, f"Failed to validate team compatibility: {str(e)}"
+
+
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register all script management tools with the MCP server.
 
@@ -174,7 +311,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                params = {
+                params: dict[str, Any] = {
                     "page": page,
                     "per_page": min(per_page, 500),
                 }
@@ -267,7 +404,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                params = {
+                params: dict[str, Any] = {
                     "page": page,
                     "per_page": min(per_page, 500),
                 }
@@ -393,7 +530,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                json_data = {"host_id": host_id}
+                json_data: dict[str, Any] = {"host_id": host_id}
 
                 # Validate only one script source is provided
                 provided_count = sum(
@@ -413,6 +550,19 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 if script_id is not None:
                     json_data["script_id"] = script_id
+
+                    # Proactive team validation for saved scripts
+                    is_compatible, error_msg = await validate_script_host_team_compatibility(
+                        client, script_id, host_id
+                    )
+                    if not is_compatible:
+                        logger.warning(f"Team compatibility check failed: {error_msg}")
+                        return {
+                            "success": False,
+                            "message": error_msg,
+                            "host_id": host_id,
+                            "execution_id": None,
+                        }
                 elif script_contents is not None:
                     if len(script_contents) > 10000:
                         return {
@@ -450,11 +600,22 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "execution_id": None,
                     }
 
-        except FleetAPIError as e:
-            logger.error(f"Failed to run script on host {host_id}: {e}")
+        except FleetValidationError as e:
+            logger.error(f"Failed to run script on host {host_id} - validation error: {e}")
+            logger.debug(f"Response data: {e.response_data}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to run script: {str(e)}",
+                "message": f"Failed to run script: {error_details}",
+                "host_id": host_id,
+                "execution_id": None,
+            }
+        except FleetAPIError as e:
+            logger.error(f"Failed to run script on host {host_id}: {e}")
+            error_details = extract_error_details(e)
+            return {
+                "success": False,
+                "message": f"Failed to run script: {error_details}",
                 "host_id": host_id,
                 "execution_id": None,
             }
@@ -481,7 +642,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                json_data = {"script_id": script_id}
+                json_data: dict[str, Any] = {"script_id": script_id}
 
                 # Validate either host_ids or filters is provided
                 if (host_ids is None and filters is None) or (
@@ -516,11 +677,21 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "batch_execution_id": None,
                     }
 
-        except FleetAPIError as e:
-            logger.error(f"Failed to run batch script: {e}")
+        except FleetValidationError as e:
+            logger.error(f"Failed to run batch script - validation error: {e}")
+            logger.debug(f"Response data: {e.response_data}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to run batch script: {str(e)}",
+                "message": f"Failed to run batch script: {error_details}",
+                "batch_execution_id": None,
+            }
+        except FleetAPIError as e:
+            logger.error(f"Failed to run batch script: {e}")
+            error_details = extract_error_details(e)
+            return {
+                "success": False,
+                "message": f"Failed to run batch script: {error_details}",
                 "batch_execution_id": None,
             }
 
@@ -553,11 +724,21 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "batch_execution_id": batch_execution_id,
                     }
 
-        except FleetAPIError as e:
-            logger.error(f"Failed to cancel batch script {batch_execution_id}: {e}")
+        except FleetValidationError as e:
+            logger.error(f"Failed to cancel batch script {batch_execution_id} - validation error: {e}")
+            logger.debug(f"Response data: {e.response_data}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to cancel batch script: {str(e)}",
+                "message": f"Failed to cancel batch script: {error_details}",
+                "batch_execution_id": batch_execution_id,
+            }
+        except FleetAPIError as e:
+            logger.error(f"Failed to cancel batch script {batch_execution_id}: {e}")
+            error_details = extract_error_details(e)
+            return {
+                "success": False,
+                "message": f"Failed to cancel batch script: {error_details}",
                 "batch_execution_id": batch_execution_id,
             }
 
@@ -626,17 +807,19 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         except FleetValidationError as e:
             logger.error(f"Failed to create script - validation error: {e}")
-            logger.error(f"Response data: {e.response_data}")
+            logger.debug(f"Response data: {e.response_data}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to create script: {str(e)}",
+                "message": f"Failed to create script: {error_details}",
                 "script_id": None,
             }
         except FleetAPIError as e:
             logger.error(f"Failed to create script: {e}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to create script: {str(e)}",
+                "message": f"Failed to create script: {error_details}",
                 "script_id": None,
             }
 
@@ -699,17 +882,19 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         except FleetValidationError as e:
             logger.error(f"Failed to modify script {script_id} - validation error: {e}")
-            logger.error(f"Response data: {e.response_data}")
+            logger.debug(f"Response data: {e.response_data}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to modify script: {str(e)}",
+                "message": f"Failed to modify script: {error_details}",
                 "script": None,
             }
         except FleetAPIError as e:
             logger.error(f"Failed to modify script {script_id}: {e}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to modify script: {str(e)}",
+                "message": f"Failed to modify script: {error_details}",
                 "script": None,
             }
 
@@ -740,11 +925,21 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "script_id": script_id,
                     }
 
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete script {script_id}: {e}")
+        except FleetValidationError as e:
+            logger.error(f"Failed to delete script {script_id} - validation error: {e}")
+            logger.debug(f"Response data: {e.response_data}")
+            error_details = extract_error_details(e)
             return {
                 "success": False,
-                "message": f"Failed to delete script: {str(e)}",
+                "message": f"Failed to delete script: {error_details}",
+                "script_id": script_id,
+            }
+        except FleetAPIError as e:
+            logger.error(f"Failed to delete script {script_id}: {e}")
+            error_details = extract_error_details(e)
+            return {
+                "success": False,
+                "message": f"Failed to delete script: {error_details}",
                 "script_id": script_id,
             }
 
