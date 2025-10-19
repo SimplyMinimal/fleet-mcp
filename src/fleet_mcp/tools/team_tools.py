@@ -115,6 +115,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     ) -> dict[str, Any]:
         """List all users in Fleet.
 
+        **Note:** This endpoint requires admin-level permissions. If you receive a 403
+        Forbidden error, verify that your API token has admin privileges.
+
         Args:
             page: Page number for pagination (0-based)
             per_page: Number of users per page
@@ -162,6 +165,18 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         except FleetAPIError as e:
             logger.error(f"Failed to list users: {e}")
+            # Provide helpful message for 403 Forbidden errors
+            if e.status_code == 403:
+                return {
+                    "success": False,
+                    "message": (
+                        "Failed to list users: Access denied (403 Forbidden). "
+                        "This endpoint requires admin-level permissions. "
+                        "Please verify that your API token has admin privileges."
+                    ),
+                    "users": [],
+                    "count": 0,
+                }
             return {
                 "success": False,
                 "message": f"Failed to list users: {str(e)}",
@@ -172,6 +187,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     @mcp.tool()
     async def fleet_get_user(user_id: int) -> dict[str, Any]:
         """Get details of a specific user.
+
+        **Note:** This endpoint requires admin-level permissions. If you receive a 403
+        Forbidden error, verify that your API token has admin privileges.
 
         Args:
             user_id: ID of the user to retrieve
@@ -201,6 +219,18 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         except FleetAPIError as e:
             logger.error(f"Failed to get user {user_id}: {e}")
+            # Provide helpful message for 403 Forbidden errors
+            if e.status_code == 403:
+                return {
+                    "success": False,
+                    "message": (
+                        "Failed to get user: Access denied (403 Forbidden). "
+                        "This endpoint requires admin-level permissions. "
+                        "Please verify that your API token has admin privileges."
+                    ),
+                    "user": None,
+                    "user_id": user_id,
+                }
             return {
                 "success": False,
                 "message": f"Failed to get user: {str(e)}",
