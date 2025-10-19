@@ -197,24 +197,62 @@ class TestServerHealthCheck:
 
     @pytest.mark.asyncio
     async def test_get_fleet_user_info_success(self, mock_config):
-        """Test _get_fleet_user_info with successful API response."""
+        """Test _get_fleet_user_info with successful API response.
+
+        Tests with realistic Fleet API response structure including all fields
+        from the /api/v1/fleet/me endpoint.
+        """
         from fleet_mcp.client import FleetResponse
 
         server = FleetMCPServer(mock_config)
 
-        # Mock the get_current_user response
+        # Mock the get_current_user response with realistic Fleet API structure
+        # This matches the actual /api/v1/fleet/me endpoint response
         mock_user_data = {
             "user": {
+                "created_at": "2020-11-13T22:57:12Z",
+                "updated_at": "2020-11-16T23:49:41Z",
                 "id": 1,
-                "email": "admin@example.com",
                 "name": "Admin User",
-                "role": "admin",
+                "email": "admin@example.com",
                 "global_role": "admin",
+                "enabled": True,
+                "force_password_reset": False,
+                "gravatar_url": "",
+                "sso_enabled": False,
+                "role": "admin",  # Role on a specific team (if not global admin)
                 "teams": [
-                    {"id": 1, "name": "Team 1"},
-                    {"id": 2, "name": "Team 2"},
+                    {
+                        "id": 1,
+                        "name": "Engineering",
+                        "description": "Engineering team",
+                        "role": "admin",
+                    },
+                    {
+                        "id": 2,
+                        "name": "Operations",
+                        "description": "Operations team",
+                        "role": "maintainer",
+                    },
                 ],
-            }
+            },
+            "available_teams": [
+                {
+                    "id": 1,
+                    "name": "Engineering",
+                    "description": "Engineering team",
+                },
+                {
+                    "id": 2,
+                    "name": "Operations",
+                    "description": "Operations team",
+                },
+                {
+                    "id": 3,
+                    "name": "Security",
+                    "description": "Security team",
+                },
+            ],
         }
 
         mock_response = FleetResponse(
@@ -235,6 +273,7 @@ class TestServerHealthCheck:
             assert user_info["fleet_user_email"] == "admin@example.com"
             assert user_info["fleet_user_name"] == "Admin User"
             assert user_info["fleet_user_global_role"] == "admin"
+            # Should extract team IDs from user.teams, not available_teams
             assert user_info["fleet_user_teams"] == [1, 2]
             assert user_info["fleet_user_error"] is None
 
@@ -287,6 +326,144 @@ class TestServerHealthCheck:
             assert user_info["fleet_user_global_role"] is None
             assert user_info["fleet_user_teams"] is None
             assert "Network error" in user_info["fleet_user_error"]
+
+    @pytest.mark.asyncio
+    async def test_get_fleet_user_info_null_global_role(self, mock_config):
+        """Test _get_fleet_user_info when global_role is null (team-specific user).
+
+        Non-admin users who only have team-specific roles will have null global_role.
+        """
+        from fleet_mcp.client import FleetResponse
+
+        server = FleetMCPServer(mock_config)
+
+        # Mock a team-specific user (no global role)
+        mock_user_data = {
+            "user": {
+                "id": 2,
+                "name": "Team Lead",
+                "email": "lead@example.com",
+                "global_role": None,  # No global role
+                "role": "maintainer",  # Role on specific team
+                "teams": [
+                    {
+                        "id": 1,
+                        "name": "Engineering",
+                        "role": "maintainer",
+                    }
+                ],
+            }
+        }
+
+        mock_response = FleetResponse(
+            success=True,
+            data=mock_user_data,
+            message="Success",
+        )
+
+        with patch.object(
+            server.client,
+            "get_current_user",
+            return_value=mock_response,
+        ):
+            user_info = await server._get_fleet_user_info()
+
+            # Verify handling of null global_role
+            assert user_info["fleet_user_role"] == "maintainer"
+            assert user_info["fleet_user_email"] == "lead@example.com"
+            assert user_info["fleet_user_name"] == "Team Lead"
+            assert user_info["fleet_user_global_role"] is None  # Should be None
+            assert user_info["fleet_user_teams"] == [1]
+            assert user_info["fleet_user_error"] is None
+
+    @pytest.mark.asyncio
+    async def test_get_fleet_user_info_empty_teams(self, mock_config):
+        """Test _get_fleet_user_info when teams array is empty."""
+        from fleet_mcp.client import FleetResponse
+
+        server = FleetMCPServer(mock_config)
+
+        # Mock a user with no team assignments
+        mock_user_data = {
+            "user": {
+                "id": 3,
+                "name": "Observer User",
+                "email": "observer@example.com",
+                "global_role": "observer",
+                "role": None,
+                "teams": [],  # Empty teams array
+            }
+        }
+
+        mock_response = FleetResponse(
+            success=True,
+            data=mock_user_data,
+            message="Success",
+        )
+
+        with patch.object(
+            server.client,
+            "get_current_user",
+            return_value=mock_response,
+        ):
+            user_info = await server._get_fleet_user_info()
+
+            # Verify handling of empty teams
+            assert user_info["fleet_user_role"] is None
+            assert user_info["fleet_user_email"] == "observer@example.com"
+            assert user_info["fleet_user_name"] == "Observer User"
+            assert user_info["fleet_user_global_role"] == "observer"
+            assert user_info["fleet_user_teams"] is None  # Should be None, not empty list
+            assert user_info["fleet_user_error"] is None
+
+    @pytest.mark.asyncio
+    async def test_get_fleet_user_info_uses_user_teams_not_available_teams(self, mock_config):
+        """Test that _get_fleet_user_info uses user.teams, not available_teams.
+
+        The API response includes both user.teams (teams the user is a member of)
+        and available_teams (all teams in the Fleet instance). We should only
+        extract team IDs from user.teams.
+        """
+        from fleet_mcp.client import FleetResponse
+
+        server = FleetMCPServer(mock_config)
+
+        # Mock response with both user.teams and available_teams
+        mock_user_data = {
+            "user": {
+                "id": 1,
+                "name": "Admin User",
+                "email": "admin@example.com",
+                "global_role": "admin",
+                "teams": [
+                    {"id": 1, "name": "Engineering"},
+                    {"id": 2, "name": "Operations"},
+                ],
+            },
+            "available_teams": [
+                {"id": 1, "name": "Engineering"},
+                {"id": 2, "name": "Operations"},
+                {"id": 3, "name": "Security"},
+                {"id": 4, "name": "Finance"},
+            ],
+        }
+
+        mock_response = FleetResponse(
+            success=True,
+            data=mock_user_data,
+            message="Success",
+        )
+
+        with patch.object(
+            server.client,
+            "get_current_user",
+            return_value=mock_response,
+        ):
+            user_info = await server._get_fleet_user_info()
+
+            # Should only have teams from user.teams (1, 2), not all available_teams (1, 2, 3, 4)
+            assert user_info["fleet_user_teams"] == [1, 2]
+            assert user_info["fleet_user_error"] is None
 
     @pytest.mark.asyncio
     async def test_health_check_includes_server_config(self, mock_config):
