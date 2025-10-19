@@ -135,6 +135,95 @@ class FleetMCPServer:
         # Register server health check tool (always available)
         self._register_health_check()
 
+    @staticmethod
+    def _format_bytes(size_bytes: int | None) -> str:
+        """Format bytes into human-readable format.
+
+        Args:
+            size_bytes: Size in bytes
+
+        Returns:
+            Human-readable size string (e.g., "1.5 MB")
+        """
+        if size_bytes is None:
+            return "N/A"
+
+        if size_bytes == 0:
+            return "0 B"
+
+        units = ["B", "KB", "MB", "GB"]
+        unit_index = 0
+        size = float(size_bytes)
+
+        while size >= 1024.0 and unit_index < len(units) - 1:
+            size /= 1024.0
+            unit_index += 1
+
+        return f"{size:.2f} {units[unit_index]}"
+
+    @staticmethod
+    async def _get_cache_info() -> dict[str, Any]:
+        """Get osquery table schema cache information.
+
+        Returns:
+            Dict containing cache status, file info, and validity
+        """
+        try:
+            from .tools.table_discovery import get_table_cache
+
+            cache = await get_table_cache()
+            raw_info = cache.get_cache_info()
+
+            # Format the cache information with human-readable values
+            cache_info = {
+                "cached": raw_info["cache_exists"],
+                "cache_file_path": raw_info["schema_cache_file"],
+                "file_size_bytes": raw_info["cache_size_bytes"],
+                "file_size_human": FleetMCPServer._format_bytes(
+                    raw_info["cache_size_bytes"]
+                ),
+                "tables_loaded": raw_info["loaded_schemas_count"],
+                "cache_age_seconds": raw_info["cache_age_seconds"],
+                "cache_age_hours": (
+                    round(raw_info["cache_age_hours"], 2)
+                    if raw_info["cache_age_hours"] is not None
+                    else None
+                ),
+                "cache_valid": raw_info["is_cache_valid"],
+                "cache_ttl_hours": raw_info["cache_ttl_hours"],
+                "last_modified": (
+                    f"{raw_info['cache_age_hours']:.2f} hours ago"
+                    if raw_info["cache_age_hours"] is not None
+                    else "Never"
+                ),
+                "schema_source": raw_info["schema_source"],
+                "errors": raw_info["loading_errors"],
+                "warnings": raw_info["loading_warnings"],
+            }
+
+            # Add a status field for quick assessment
+            if raw_info["loading_errors"]:
+                cache_info["status"] = "error"
+            elif raw_info["loading_warnings"]:
+                cache_info["status"] = "warning"
+            elif raw_info["loaded_schemas_count"] >= 50:
+                cache_info["status"] = "healthy"
+            else:
+                cache_info["status"] = "degraded"
+
+            return cache_info
+
+        except Exception as e:
+            logger.warning(f"Failed to get cache info: {e}")
+            return {
+                "cached": False,
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to retrieve cache information",
+                "errors": [str(e)],
+                "warnings": [],
+            }
+
     def _register_health_check(self) -> None:
         """Register health check tool."""
 
@@ -149,12 +238,16 @@ class FleetMCPServer:
                 async with self.client:
                     response = await self.client.health_check()
 
+                    # Get osquery table schema cache information
+                    cache_info = await self._get_cache_info()
+
                     return {
                         "success": response.success,
                         "message": response.message,
                         "server_url": self.config.server_url,
                         "status": "healthy" if response.success else "unhealthy",
                         "details": response.data or {},
+                        "osquery_schema_cache": cache_info,
                     }
 
             except Exception as e:

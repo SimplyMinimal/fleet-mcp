@@ -1,24 +1,45 @@
 """Dynamic osquery table discovery and schema management."""
 
+import json
 import logging
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
-import yaml
 
 from ..client import FleetClient
 
 logger = logging.getLogger(__name__)
+
+# Official Fleet osquery schema URL
+FLEET_SCHEMA_URL = (
+    "https://raw.githubusercontent.com/fleetdm/fleet/main/schema/osquery_fleet_schema.json"
+)
+
+# Cache directory and file
+CACHE_DIR = Path.home() / ".fleet-mcp" / "cache"
+SCHEMA_CACHE_FILE = CACHE_DIR / "osquery_fleet_schema.json"
+SCHEMA_CACHE_TTL = 86400  # 24 hours in seconds
 
 
 class TableSchemaCache:
     """Multi-level cache for osquery table schemas.
 
     This cache manages:
-    1. Fleet schemas (loaded once at startup from GitHub)
+    1. Fleet schemas (loaded from official JSON schema with 24-hour cache)
     2. Per-host table lists (cached with 1-hour TTL)
     3. Bundled fallback schemas (for offline operation)
+
+    The official Fleet schema is downloaded from:
+    https://raw.githubusercontent.com/fleetdm/fleet/main/schema/osquery_fleet_schema.json
+
+    Caching behavior:
+    - Schema is cached locally in ~/.fleet-mcp/cache/osquery_fleet_schema.json
+    - Cache is valid for 24 hours
+    - On cache miss or expiry, attempts to download fresh schema
+    - Falls back to cached version if download fails
+    - Falls back to bundled minimal schemas if no cache exists
     """
 
     def __init__(self) -> None:
@@ -26,77 +47,268 @@ class TableSchemaCache:
         self.host_tables: dict[str, list[dict[str, Any]]] = {}
         self.last_fetch: dict[str, float] = {}
         self.fleet_schemas_loaded = False
-        self.cache_ttl = 3600  # 1 hour
+        self.cache_ttl = 3600  # 1 hour for host tables
+        self.schema_cache_ttl = SCHEMA_CACHE_TTL  # 24 hours for Fleet schemas
 
-    async def initialize(self) -> None:
-        """Initialize the cache by loading Fleet schemas."""
-        if not self.fleet_schemas_loaded:
-            await self._load_fleet_schemas()
+        # Track loading status and errors
+        self.schema_source: str | None = None  # "cache", "download", "bundled", or None
+        self.loading_errors: list[str] = []  # List of error messages encountered
+        self.loading_warnings: list[str] = []  # List of warning messages encountered
+
+    async def initialize(self, force_refresh: bool = False) -> None:
+        """Initialize the cache by loading Fleet schemas.
+
+        Args:
+            force_refresh: If True, force download of fresh schema even if cache is valid
+        """
+        if not self.fleet_schemas_loaded or force_refresh:
+            await self._load_fleet_schemas(force_refresh=force_refresh)
             self.fleet_schemas_loaded = True
 
-    async def _load_fleet_schemas(self) -> None:
-        """Load table schemas from Fleet's GitHub repository."""
-        logger.info("Loading Fleet table schemas from GitHub...")
+    async def _load_fleet_schemas(self, force_refresh: bool = False) -> None:
+        """Load table schemas from Fleet's official JSON schema.
 
+        This method implements a multi-tier loading strategy:
+        1. Check local cache file (if valid and not force_refresh)
+        2. Download fresh schema from GitHub
+        3. Fall back to cached version if download fails
+        4. Fall back to bundled minimal schemas if no cache exists
+
+        Args:
+            force_refresh: If True, skip cache and force download
+        """
+        logger.info("Loading Fleet table schemas...")
+
+        # Clear previous errors/warnings
+        self.loading_errors.clear()
+        self.loading_warnings.clear()
+        self.schema_source = None
+
+        # Ensure cache directory exists
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Try to load from cache first (unless force_refresh)
+        if not force_refresh and SCHEMA_CACHE_FILE.exists():
+            cache_age = time.time() - SCHEMA_CACHE_FILE.stat().st_mtime
+            if cache_age < self.schema_cache_ttl:
+                try:
+                    schemas = await self._load_cached_schema()
+                    if schemas:
+                        self.fleet_schemas = schemas
+                        self.schema_source = "cache"
+                        logger.info(
+                            f"Loaded {len(schemas)} table schemas from cache "
+                            f"(age: {cache_age/3600:.1f} hours)"
+                        )
+                        return
+                except Exception as e:
+                    error_msg = f"Failed to load cached schema: {e}"
+                    logger.warning(error_msg)
+                    self.loading_warnings.append(error_msg)
+
+        # Try to download fresh schema
         try:
-            # Try to fetch from GitHub
-            schemas = await self._fetch_from_github()
+            schemas = await self._download_fleet_schema()
             if schemas:
                 self.fleet_schemas = schemas
-                logger.info(f"Loaded {len(schemas)} table schemas from Fleet GitHub")
+                self.schema_source = "download"
+                # Save to cache
+                await self._save_schema_cache(schemas)
+                logger.info(
+                    f"Downloaded and cached {len(schemas)} table schemas from Fleet"
+                )
                 return
         except Exception as e:
-            logger.warning(f"Failed to fetch Fleet schemas from GitHub: {e}")
+            error_msg = f"Failed to download Fleet schema: {e}"
+            logger.warning(error_msg)
+            self.loading_warnings.append(error_msg)
 
-        # Fall back to bundled schemas
+        # Fall back to cached version (even if expired)
+        if SCHEMA_CACHE_FILE.exists():
+            try:
+                schemas = await self._load_cached_schema()
+                if schemas:
+                    self.fleet_schemas = schemas
+                    self.schema_source = "cache_stale"
+                    warning_msg = (
+                        f"Using stale cached schema ({len(schemas)} tables) - "
+                        "download failed"
+                    )
+                    logger.warning(warning_msg)
+                    self.loading_warnings.append(warning_msg)
+                    return
+            except Exception as e:
+                error_msg = f"Failed to load stale cache: {e}"
+                logger.error(error_msg)
+                self.loading_errors.append(error_msg)
+
+        # Last resort: fall back to bundled schemas
         try:
             schemas = await self._load_bundled_schemas()
             self.fleet_schemas = schemas
-            logger.info(f"Loaded {len(schemas)} bundled table schemas")
+            self.schema_source = "bundled"
+            warning_msg = (
+                f"Using bundled fallback schemas ({len(schemas)} tables) - "
+                "no cache available"
+            )
+            logger.warning(warning_msg)
+            self.loading_warnings.append(warning_msg)
         except Exception as e:
-            logger.error(f"Failed to load bundled schemas: {e}")
+            error_msg = f"Failed to load bundled schemas: {e}"
+            logger.error(error_msg)
+            self.loading_errors.append(error_msg)
             self.fleet_schemas = {}
+            self.schema_source = "none"
 
-    async def _fetch_from_github(self) -> dict[str, dict[str, Any]]:
-        """Fetch table schemas from Fleet's GitHub repository.
+    async def _download_fleet_schema(self) -> dict[str, dict[str, Any]]:
+        """Download the official Fleet osquery schema JSON file.
 
         Returns:
             Dictionary mapping table names to schema dictionaries
         """
-        base_url = "https://api.github.com/repos/fleetdm/fleet/contents/schema/tables"
+        logger.debug(f"Downloading Fleet schema from {FLEET_SCHEMA_URL}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Get list of schema files
-            response = await client.get(base_url)
+            response = await client.get(FLEET_SCHEMA_URL)
             response.raise_for_status()
-            files = response.json()
 
-            schemas = {}
+            # Parse JSON schema
+            schema_json = response.json()
 
-            # Fetch each YAML file (limit to avoid rate limits)
-            # GitHub API allows 60 requests/hour for unauthenticated, 5000 for authenticated
-            # We'll fetch up to 200 schemas (most important ones)
-            yaml_files = [f for f in files if f["name"].endswith(".yml")][:200]
-
-            for file_info in yaml_files:
-                try:
-                    table_name = file_info["name"].replace(".yml", "")
-
-                    # Fetch the YAML content
-                    yaml_response = await client.get(file_info["download_url"])
-                    yaml_response.raise_for_status()
-
-                    # Parse YAML
-                    schema_data = yaml.safe_load(yaml_response.text)
-
-                    # Convert to our format
-                    schemas[table_name] = self._parse_fleet_schema(schema_data)
-
-                except Exception as e:
-                    logger.debug(f"Failed to fetch schema for {file_info['name']}: {e}")
-                    continue
+            # Convert to our internal format
+            schemas = self._parse_fleet_json_schema(schema_json)
 
             return schemas
+
+    async def _load_cached_schema(self) -> dict[str, dict[str, Any]]:
+        """Load schema from local cache file.
+
+        Returns:
+            Dictionary mapping table names to schema dictionaries
+        """
+        logger.debug(f"Loading schema from cache: {SCHEMA_CACHE_FILE}")
+
+        with open(SCHEMA_CACHE_FILE, "r") as f:
+            schema_json = json.load(f)
+
+        # Convert to our internal format
+        schemas = self._parse_fleet_json_schema(schema_json)
+
+        return schemas
+
+    async def _save_schema_cache(self, _schemas: dict[str, dict[str, Any]]) -> None:
+        """Save schemas to local cache file.
+
+        Note: We save the raw JSON format, not our internal format,
+        to preserve all original data from Fleet.
+
+        Args:
+            _schemas: Schema dictionary (unused - we re-download to get raw JSON)
+        """
+        # We need to re-download to get the raw JSON
+        # This is a bit inefficient but ensures we cache the original format
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(FLEET_SCHEMA_URL)
+                response.raise_for_status()
+                schema_json = response.json()
+
+                with open(SCHEMA_CACHE_FILE, "w") as f:
+                    json.dump(schema_json, f, indent=2)
+
+                logger.debug(f"Saved schema cache to {SCHEMA_CACHE_FILE}")
+        except Exception as e:
+            logger.warning(f"Failed to save schema cache: {e}")
+
+    def _parse_fleet_json_schema(
+        self, schema_json: dict | list
+    ) -> dict[str, dict[str, Any]]:
+        """Parse Fleet's official JSON schema format into our internal format.
+
+        The Fleet JSON schema is a list of table objects with the structure:
+        [
+          {
+            "name": "table_name",
+            "description": "...",
+            "platforms": ["darwin", "linux", "windows"],
+            "evented": false,
+            "columns": [
+              {
+                "name": "column_name",
+                "type": "TEXT",
+                "description": "...",
+                "required": false
+              },
+              ...
+            ],
+            "examples": "SELECT ... FROM table_name;",
+            "notes": "..."
+          },
+          ...
+        ]
+
+        Args:
+            schema_json: Parsed JSON data from Fleet schema file (list or dict)
+
+        Returns:
+            Dictionary mapping table names to schema dictionaries in our format
+        """
+        schemas = {}
+
+        # Handle both list format (official schema) and dict format (legacy/test)
+        if isinstance(schema_json, list):
+            table_list = schema_json
+        else:
+            # Convert dict format to list format
+            table_list = [
+                {"name": name, **data} for name, data in schema_json.items()
+            ]
+
+        for table_data in table_list:
+            table_name = table_data.get("name")
+            if not table_name:
+                continue
+
+            # Extract column information
+            columns = []
+            column_details = {}
+
+            for col in table_data.get("columns", []):
+                col_name = col.get("name", "")
+                if col_name:
+                    columns.append(col_name)
+                    column_details[col_name] = {
+                        "type": col.get("type", "TEXT"),
+                        "description": col.get("description", ""),
+                        "required": col.get("required", False),
+                    }
+
+            # Parse examples (can be string or list)
+            examples_raw = table_data.get("examples", "")
+            if isinstance(examples_raw, str):
+                examples = [
+                    ex.strip() for ex in examples_raw.strip().split("\n") if ex.strip()
+                ]
+            elif isinstance(examples_raw, list):
+                examples = examples_raw
+            else:
+                examples = []
+
+            schemas[table_name] = {
+                "description": table_data.get("description", "").strip(),
+                "platforms": table_data.get("platforms", []),
+                "evented": table_data.get("evented", False),
+                "columns": columns,
+                "column_details": column_details,
+                "examples": examples,
+                "notes": (
+                    table_data.get("notes", "").strip()
+                    if table_data.get("notes")
+                    else None
+                ),
+            }
+
+        return schemas
 
     async def _load_bundled_schemas(self) -> dict[str, dict[str, Any]]:
         """Load bundled fallback schemas.
@@ -104,8 +316,7 @@ class TableSchemaCache:
         Returns:
             Dictionary mapping table names to schema dictionaries
         """
-        # For now, return a minimal set of critical tables
-        # In production, this would load from a bundled JSON/YAML file
+        # Minimal set of critical tables for offline fallback
         return {
             "rpm_packages": {
                 "description": "RPM packages installed on RHEL/CentOS/Fedora systems",
@@ -120,6 +331,7 @@ class TableSchemaCache:
                     "install_time",
                     "vendor",
                 ],
+                "column_details": {},
                 "examples": [
                     "SELECT name, version FROM rpm_packages WHERE name = 'platform-python';"
                 ],
@@ -130,49 +342,12 @@ class TableSchemaCache:
                 "platforms": ["darwin", "linux", "windows"],
                 "evented": False,
                 "columns": ["pid", "name", "path", "cmdline", "state", "uid", "gid"],
+                "column_details": {},
                 "examples": [
                     "SELECT pid, name, cmdline FROM processes WHERE name = 'chrome';"
                 ],
                 "notes": None,
             },
-        }
-
-    def _parse_fleet_schema(self, yaml_data: dict) -> dict[str, Any]:
-        """Parse Fleet's YAML schema format into our internal format.
-
-        Args:
-            yaml_data: Parsed YAML data from Fleet schema file
-
-        Returns:
-            Schema dictionary in our internal format
-        """
-        columns = []
-        column_details = {}
-
-        if "columns" in yaml_data:
-            for col in yaml_data["columns"]:
-                col_name = col.get("name", "")
-                columns.append(col_name)
-                column_details[col_name] = {
-                    "type": col.get("type", "TEXT"),
-                    "description": col.get("description", ""),
-                    "required": col.get("required", False),
-                }
-
-        return {
-            "description": yaml_data.get("description", "").strip(),
-            "platforms": yaml_data.get("platforms", []),
-            "evented": yaml_data.get("evented", False),
-            "columns": columns,
-            "column_details": column_details,
-            "examples": (
-                yaml_data.get("examples", "").strip().split("\n")
-                if yaml_data.get("examples")
-                else []
-            ),
-            "notes": (
-                yaml_data.get("notes", "").strip() if yaml_data.get("notes") else None
-            ),
         }
 
     async def get_tables_for_host(
@@ -360,6 +535,72 @@ class TableSchemaCache:
                 del self.last_fetch[key]
 
         logger.info(f"Invalidated cache for host {host_id}")
+
+    async def refresh_fleet_schemas(self) -> bool:
+        """Force refresh of Fleet schemas from GitHub.
+
+        This bypasses the cache and downloads a fresh copy of the schema.
+        Useful for getting the latest table definitions.
+
+        Returns:
+            True if refresh was successful, False otherwise
+        """
+        try:
+            await self._load_fleet_schemas(force_refresh=True)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to refresh Fleet schemas: {e}")
+            return False
+
+    def get_cache_info(self) -> dict[str, Any]:
+        """Get information about the current cache state.
+
+        Returns:
+            Dictionary with cache statistics and metadata
+        """
+        cache_exists = SCHEMA_CACHE_FILE.exists()
+        cache_age = None
+        cache_size = None
+
+        if cache_exists:
+            cache_age = time.time() - SCHEMA_CACHE_FILE.stat().st_mtime
+            cache_size = SCHEMA_CACHE_FILE.stat().st_size
+
+        # Detect potential issues
+        table_count = len(self.fleet_schemas)
+        warnings = list(self.loading_warnings)  # Copy the list
+
+        # Add warning if table count is unexpectedly low
+        if table_count > 0 and table_count < 50:
+            warnings.append(
+                f"Low table count ({table_count} tables) - expected 100+ tables. "
+                "Cache may be incomplete or using test data."
+            )
+
+        # Add warning if no schemas loaded at all
+        if table_count == 0 and self.fleet_schemas_loaded:
+            warnings.append(
+                "No schemas loaded - all loading attempts failed. "
+                "Check network connectivity and cache file."
+            )
+
+        return {
+            "schema_cache_file": str(SCHEMA_CACHE_FILE),
+            "cache_exists": cache_exists,
+            "cache_age_seconds": cache_age,
+            "cache_age_hours": cache_age / 3600 if cache_age else None,
+            "cache_size_bytes": cache_size,
+            "cache_ttl_seconds": self.schema_cache_ttl,
+            "cache_ttl_hours": self.schema_cache_ttl / 3600,
+            "is_cache_valid": (
+                cache_age < self.schema_cache_ttl if cache_age else False
+            ),
+            "loaded_schemas_count": table_count,
+            "cached_hosts_count": len(self.host_tables),
+            "schema_source": self.schema_source,
+            "loading_errors": list(self.loading_errors),  # Copy the list
+            "loading_warnings": warnings,
+        }
 
 
 # Global cache instance

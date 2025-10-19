@@ -38,16 +38,22 @@ def fleet_server_available():
     """Check if Fleet server is available for integration tests.
 
     This can be used to skip integration tests if the server is not available.
+    Reads server URL from environment variables or .env file.
     """
     import os
 
     import httpx
+    from dotenv import load_dotenv
+
+    # Load .env file explicitly for tests
+    load_dotenv()
 
     server_url = os.getenv("FLEET_SERVER_URL", "http://192.168.68.125:1337")
+    verify_ssl = os.getenv("FLEET_VERIFY_SSL", "true").lower() in ("true", "1", "yes")
 
     try:
         # Quick connectivity check
-        response = httpx.get(f"{server_url}/healthz", timeout=5.0)
+        response = httpx.get(f"{server_url}/healthz", timeout=5.0, verify=verify_ssl)
         return response.status_code in [200, 401, 404]  # Server is responding
     except Exception:
         return False
