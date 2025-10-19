@@ -21,6 +21,23 @@ class TestServerHealthCheck:
             server_url="https://test.fleet.com", api_token="test-token-123456789"
         )
 
+    @pytest.fixture(autouse=True)
+    def reset_global_cache(self):
+        """Reset the global table cache before and after each test.
+
+        This ensures that tests don't interfere with each other by leaving
+        cached data or mock patches in place.
+        """
+        # Reset before test
+        import fleet_mcp.tools.table_discovery as td
+        original_cache = td._table_cache
+        td._table_cache = None
+
+        yield
+
+        # Reset after test
+        td._table_cache = original_cache
+
     @pytest.mark.asyncio
     async def test_health_check_tool_registered(self, mock_config):
         """Test that health check tool is registered."""
@@ -177,4 +194,148 @@ class TestServerHealthCheck:
             assert "message" in cache_info
             assert "errors" in cache_info
             assert len(cache_info["errors"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_fleet_user_info_success(self, mock_config):
+        """Test _get_fleet_user_info with successful API response."""
+        from fleet_mcp.client import FleetResponse
+
+        server = FleetMCPServer(mock_config)
+
+        # Mock the get_current_user response
+        mock_user_data = {
+            "user": {
+                "id": 1,
+                "email": "admin@example.com",
+                "name": "Admin User",
+                "role": "admin",
+                "global_role": "admin",
+                "teams": [
+                    {"id": 1, "name": "Team 1"},
+                    {"id": 2, "name": "Team 2"},
+                ],
+            }
+        }
+
+        mock_response = FleetResponse(
+            success=True,
+            data=mock_user_data,
+            message="Success",
+        )
+
+        with patch.object(
+            server.client,
+            "get_current_user",
+            return_value=mock_response,
+        ):
+            user_info = await server._get_fleet_user_info()
+
+            # Verify user info structure
+            assert user_info["fleet_user_role"] == "admin"
+            assert user_info["fleet_user_email"] == "admin@example.com"
+            assert user_info["fleet_user_name"] == "Admin User"
+            assert user_info["fleet_user_global_role"] == "admin"
+            assert user_info["fleet_user_teams"] == [1, 2]
+            assert user_info["fleet_user_error"] is None
+
+    @pytest.mark.asyncio
+    async def test_get_fleet_user_info_failure(self, mock_config):
+        """Test _get_fleet_user_info when API call fails."""
+        from fleet_mcp.client import FleetResponse
+
+        server = FleetMCPServer(mock_config)
+
+        # Mock a failed get_current_user response
+        mock_response = FleetResponse(
+            success=False,
+            data=None,
+            message="Authentication failed",
+        )
+
+        with patch.object(
+            server.client,
+            "get_current_user",
+            return_value=mock_response,
+        ):
+            user_info = await server._get_fleet_user_info()
+
+            # Verify error handling
+            assert user_info["fleet_user_role"] is None
+            assert user_info["fleet_user_email"] is None
+            assert user_info["fleet_user_name"] is None
+            assert user_info["fleet_user_global_role"] is None
+            assert user_info["fleet_user_teams"] is None
+            assert user_info["fleet_user_error"] == "Authentication failed"
+
+    @pytest.mark.asyncio
+    async def test_get_fleet_user_info_exception(self, mock_config):
+        """Test _get_fleet_user_info when an exception occurs."""
+        server = FleetMCPServer(mock_config)
+
+        # Mock an exception during get_current_user
+        with patch.object(
+            server.client,
+            "get_current_user",
+            side_effect=Exception("Network error"),
+        ):
+            user_info = await server._get_fleet_user_info()
+
+            # Verify error handling
+            assert user_info["fleet_user_role"] is None
+            assert user_info["fleet_user_email"] is None
+            assert user_info["fleet_user_name"] is None
+            assert user_info["fleet_user_global_role"] is None
+            assert user_info["fleet_user_teams"] is None
+            assert "Network error" in user_info["fleet_user_error"]
+
+    @pytest.mark.asyncio
+    async def test_health_check_includes_server_config(self, mock_config):
+        """Test that health check includes server configuration."""
+        # Create server with specific config
+        config = FleetConfig(
+            server_url="https://test.fleet.com",
+            api_token="test-token-123456789",
+            readonly=True,
+            allow_select_queries=True,
+        )
+        server = FleetMCPServer(config)
+
+        # Mock the health check and user info calls
+        mock_response = httpx.Response(
+            status_code=200,
+            json={"config": {"server_settings": {}}},
+            request=httpx.Request("GET", "https://test.fleet.com/api/v1/fleet/config"),
+        )
+
+        mock_user_info = {
+            "fleet_user_role": "admin",
+            "fleet_user_email": "admin@example.com",
+            "fleet_user_name": "Admin User",
+            "fleet_user_global_role": "admin",
+            "fleet_user_teams": [1, 2],
+            "fleet_user_error": None,
+        }
+
+        with patch.object(
+            httpx.AsyncClient, "request", return_value=mock_response
+        ), patch.object(
+            server, "_get_fleet_user_info", return_value=mock_user_info
+        ):
+            # Call the health check tool using the MCP server's call_tool method
+            result = await server.mcp.call_tool("fleet_health_check", arguments={})
+
+            # The result is a list of TextContent objects, so we need to parse it
+            # Extract the actual result from the response
+            import json
+            result_str = str(result)
+
+            # Verify server_config is included in the result
+            assert "server_config" in result_str
+            assert "readonly_mode" in result_str
+            assert "allow_select_queries" in result_str
+
+            # Verify fleet_user is included
+            assert "fleet_user" in result_str
+            assert "fleet_user_role" in result_str
+            assert "admin@example.com" in result_str
 

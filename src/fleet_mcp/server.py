@@ -224,6 +224,56 @@ class FleetMCPServer:
                 "warnings": [],
             }
 
+    async def _get_fleet_user_info(self) -> dict[str, Any]:
+        """Get Fleet user information for the authenticated API token.
+
+        Returns:
+            Dict containing user role, email, name, and team information.
+        """
+        try:
+            response = await self.client.get_current_user()
+
+            if not response.success or not response.data:
+                return {
+                    "fleet_user_role": None,
+                    "fleet_user_email": None,
+                    "fleet_user_name": None,
+                    "fleet_user_global_role": None,
+                    "fleet_user_teams": None,
+                    "fleet_user_error": response.message,
+                }
+
+            # Extract user data from response
+            user_data = response.data.get("user", {})
+
+            # Extract role information
+            role = user_data.get("role", None)
+            global_role = user_data.get("global_role", None)
+
+            # Extract teams information
+            teams = user_data.get("teams", [])
+            team_ids = [team.get("id") for team in teams if isinstance(team, dict) and "id" in team]
+
+            return {
+                "fleet_user_role": role,
+                "fleet_user_email": user_data.get("email", None),
+                "fleet_user_name": user_data.get("name", None),
+                "fleet_user_global_role": global_role,
+                "fleet_user_teams": team_ids if team_ids else None,
+                "fleet_user_error": None,
+            }
+
+        except Exception as e:
+            logger.warning(f"Failed to get Fleet user info: {e}")
+            return {
+                "fleet_user_role": None,
+                "fleet_user_email": None,
+                "fleet_user_name": None,
+                "fleet_user_global_role": None,
+                "fleet_user_teams": None,
+                "fleet_user_error": str(e),
+            }
+
     def _register_health_check(self) -> None:
         """Register health check tool."""
 
@@ -241,12 +291,23 @@ class FleetMCPServer:
                     # Get osquery table schema cache information
                     cache_info = await self._get_cache_info()
 
+                    # Get server configuration state
+                    server_config = {
+                        "readonly_mode": self.config.readonly,
+                        "allow_select_queries": self.config.allow_select_queries,
+                    }
+
+                    # Get Fleet user information
+                    fleet_user = await self._get_fleet_user_info()
+
                     return {
                         "success": response.success,
                         "message": response.message,
                         "server_url": self.config.server_url,
                         "status": "healthy" if response.success else "unhealthy",
                         "details": response.data or {},
+                        "server_config": server_config,
+                        "fleet_user": fleet_user,
                         "osquery_schema_cache": cache_info,
                     }
 

@@ -279,3 +279,133 @@ class TestTableSchemaCache:
             assert result is True
             assert len(cache.fleet_schemas) == 2
 
+    @pytest.mark.asyncio
+    async def test_cache_with_large_table_count(self, tmp_path):
+        """Test cache loading with 100+ tables (healthy cache)."""
+        test_cache_file = tmp_path / "test_schema.json"
+        test_cache_dir = tmp_path
+
+        cache = TableSchemaCache()
+
+        # Generate 150 mock tables (simulating real Fleet schema)
+        large_schema = {}
+        for i in range(150):
+            large_schema[f"table_{i:03d}"] = {
+                "description": f"Test table {i}",
+                "platforms": ["darwin", "linux", "windows"],
+                "evented": False,
+                "columns": [
+                    {"name": "id", "type": "BIGINT", "description": "ID", "required": False},
+                    {"name": "name", "type": "TEXT", "description": "Name", "required": False},
+                ],
+                "examples": f"SELECT * FROM table_{i:03d};",
+                "notes": None,
+            }
+
+        with open(test_cache_file, "w") as f:
+            json.dump(large_schema, f)
+
+        # Load from cache
+        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+            with patch("fleet_mcp.tools.table_discovery.CACHE_DIR", test_cache_dir):
+                await cache._load_fleet_schemas(force_refresh=False)
+
+                # Verify all tables were loaded
+                assert len(cache.fleet_schemas) == 150
+                assert cache.schema_source == "cache"
+
+                # Verify cache info shows healthy status
+                info = cache.get_cache_info()
+                assert info["loaded_schemas_count"] == 150
+                assert info["schema_source"] == "cache"
+                # Should NOT have low table count warning
+                assert not any("Low table count" in w for w in info["loading_warnings"])
+
+    @pytest.mark.asyncio
+    async def test_cache_initialization_with_global_instance(self, tmp_path):
+        """Test cache initialization using the global get_table_cache function."""
+        from fleet_mcp.tools.table_discovery import get_table_cache
+
+        test_cache_file = tmp_path / "test_schema.json"
+        test_cache_dir = tmp_path
+
+        # Create a cache file with 100 tables
+        large_schema = {}
+        for i in range(100):
+            large_schema[f"table_{i:03d}"] = {
+                "description": f"Test table {i}",
+                "platforms": ["darwin", "linux"],
+                "evented": False,
+                "columns": [{"name": "id", "type": "BIGINT"}],
+            }
+
+        with open(test_cache_file, "w") as f:
+            json.dump(large_schema, f)
+
+        # Mock the cache file path and reset the global cache
+        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+            with patch("fleet_mcp.tools.table_discovery.CACHE_DIR", test_cache_dir):
+                with patch("fleet_mcp.tools.table_discovery._table_cache", None):
+                    # Get the global cache instance
+                    cache = await get_table_cache()
+
+                    # Verify it loaded the tables
+                    assert len(cache.fleet_schemas) == 100
+                    info = cache.get_cache_info()
+                    assert info["loaded_schemas_count"] == 100
+
+    @pytest.mark.asyncio
+    async def test_cache_info_warning_for_low_table_count(self, tmp_path):
+        """Test that cache info includes warning for low table count."""
+        test_cache_file = tmp_path / "test_schema.json"
+
+        cache = TableSchemaCache()
+
+        # Create a cache with only 2 tables
+        small_schema = {
+            "table_1": {"description": "Table 1", "platforms": ["linux"]},
+            "table_2": {"description": "Table 2", "platforms": ["linux"]},
+        }
+
+        with open(test_cache_file, "w") as f:
+            json.dump(small_schema, f)
+
+        # Load from cache
+        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+            await cache._load_fleet_schemas(force_refresh=False)
+
+            info = cache.get_cache_info()
+
+            # Should have warning about low table count
+            assert info["loaded_schemas_count"] == 2
+            assert len(info["loading_warnings"]) > 0
+            assert any("Low table count" in w for w in info["loading_warnings"])
+
+    @pytest.mark.asyncio
+    async def test_cache_info_no_warning_for_healthy_count(self, tmp_path):
+        """Test that cache info has no low table count warning for 100+ tables."""
+        test_cache_file = tmp_path / "test_schema.json"
+
+        cache = TableSchemaCache()
+
+        # Create a cache with 100 tables
+        healthy_schema = {}
+        for i in range(100):
+            healthy_schema[f"table_{i:03d}"] = {
+                "description": f"Table {i}",
+                "platforms": ["linux"],
+            }
+
+        with open(test_cache_file, "w") as f:
+            json.dump(healthy_schema, f)
+
+        # Load from cache
+        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+            await cache._load_fleet_schemas(force_refresh=False)
+
+            info = cache.get_cache_info()
+
+            # Should NOT have warning about low table count
+            assert info["loaded_schemas_count"] == 100
+            assert not any("Low table count" in w for w in info["loading_warnings"])
+

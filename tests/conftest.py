@@ -59,6 +59,28 @@ def fleet_server_available():
         return False
 
 
+@pytest.fixture(autouse=True)
+def reset_table_cache():
+    """Reset the global table schema cache before and after each test.
+
+    This ensures that tests don't interfere with each other by leaving
+    cached data or mock patches in place. This is especially important
+    for tests that patch the cache file path or global cache instance.
+    """
+    import fleet_mcp.tools.table_discovery as td
+
+    # Save original cache
+    original_cache = td._table_cache
+
+    # Reset before test
+    td._table_cache = None
+
+    yield
+
+    # Reset after test
+    td._table_cache = original_cache
+
+
 def pytest_collection_modifyitems(config, items):
     """Modify test collection to add markers automatically."""
     for item in items:

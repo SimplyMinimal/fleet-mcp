@@ -309,3 +309,20 @@ class FleetClient:
                 message=f"Fleet server health check failed: {str(e)}",
                 metadata={"health_check": True},
             )
+
+    async def get_current_user(self) -> FleetResponse:
+        """Get information about the currently authenticated user.
+
+        Returns:
+            FleetResponse containing user information including role, email, name, etc.
+        """
+        try:
+            response = await self.get("/api/v1/fleet/me")
+            return response
+        except FleetAPIError as e:
+            logger.warning(f"Failed to get current user info: {e}")
+            return FleetResponse(
+                success=False,
+                message=f"Failed to get current user info: {str(e)}",
+                data=None,
+            )
