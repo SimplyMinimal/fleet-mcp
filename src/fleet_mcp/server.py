@@ -12,6 +12,7 @@ from .tools import (
     policy_tools,
     query_tools,
     query_tools_readonly,
+    script_tools,
     software_tools,
     table_tools,
     team_tools,
@@ -113,6 +114,7 @@ class FleetMCPServer:
         host_tools.register_read_tools(self.mcp, self.client)
         query_tools.register_read_tools(self.mcp, self.client)
         policy_tools.register_read_tools(self.mcp, self.client)
+        script_tools.register_read_tools(self.mcp, self.client)
         software_tools.register_tools(
             self.mcp, self.client
         )  # Software tools are all read-only
@@ -130,6 +132,7 @@ class FleetMCPServer:
             host_tools.register_write_tools(self.mcp, self.client)
             query_tools.register_write_tools(self.mcp, self.client)
             policy_tools.register_write_tools(self.mcp, self.client)
+            script_tools.register_write_tools(self.mcp, self.client)
             team_tools.register_write_tools(self.mcp, self.client)
 
         # Register server health check tool (always available)

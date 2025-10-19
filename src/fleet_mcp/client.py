@@ -281,6 +281,198 @@ class FleetClient:
         """Make DELETE request."""
         return await self._make_request("DELETE", endpoint)
 
+    async def post_multipart(
+        self,
+        endpoint: str,
+        files: dict[str, tuple[str, str]] | None = None,
+        data: dict[str, str] | None = None,
+    ) -> FleetResponse:
+        """Make POST request with multipart form data.
+
+        Args:
+            endpoint: API endpoint
+            files: Dict of files to upload {field_name: (filename, content)}
+            data: Dict of form data fields
+
+        Returns:
+            FleetResponse with standardized response data
+        """
+        await self._ensure_client()
+        assert self._client is not None
+
+        url = self._build_url(endpoint)
+
+        try:
+            logger.debug(f"Making POST multipart request to {url}")
+
+            # For multipart requests, we need to use a client without the default
+            # Content-Type header so httpx can set it with the correct multipart boundary
+            # Create a temporary client with only Authorization header
+            temp_headers = {
+                "Authorization": f"Bearer {self.config.api_token}",
+                "User-Agent": self.config.user_agent,
+            }
+
+            async with httpx.AsyncClient(
+                base_url=self.config.server_url,
+                timeout=httpx.Timeout(self.config.timeout),
+                verify=self.config.verify_ssl,
+                headers=temp_headers,
+            ) as temp_client:
+                response = await temp_client.post(url, files=files, data=data)
+
+            if response.status_code == 200:
+                try:
+                    data_response = response.json()
+                    return FleetResponse(
+                        success=True,
+                        data=data_response,
+                        message="Request successful",
+                        status_code=response.status_code,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to parse JSON response: {e}")
+                    return FleetResponse(
+                        success=True,
+                        data={"raw_response": response.text},
+                        message="Request successful (non-JSON response)",
+                        status_code=response.status_code,
+                    )
+
+            elif response.status_code == 401:
+                error_data = self._parse_error_response(response)
+                raise FleetAuthenticationError(
+                    "Authentication failed - check your API token",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            elif response.status_code == 404:
+                error_data = self._parse_error_response(response)
+                raise FleetNotFoundError(
+                    "Resource not found",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            elif response.status_code == 422:
+                error_data = self._parse_error_response(response)
+                raise FleetValidationError(
+                    f"Validation error: {error_data.get('message', 'Invalid request')}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            else:
+                error_data = self._parse_error_response(response)
+                logger.error(f"POST multipart failed with status {response.status_code}: {error_data}")
+                raise FleetAPIError(
+                    f"API request failed with status {response.status_code}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+        except FleetAPIError:
+            raise
+        except Exception as e:
+            logger.error(f"Multipart request exception: {str(e)}")
+            raise FleetAPIError(f"Multipart request failed: {str(e)}") from e
+
+    async def patch_multipart(
+        self,
+        endpoint: str,
+        files: dict[str, tuple[str, str]] | None = None,
+        data: dict[str, str] | None = None,
+    ) -> FleetResponse:
+        """Make PATCH request with multipart form data.
+
+        Args:
+            endpoint: API endpoint
+            files: Dict of files to upload {field_name: (filename, content)}
+            data: Dict of form data fields
+
+        Returns:
+            FleetResponse with standardized response data
+        """
+        await self._ensure_client()
+        assert self._client is not None
+
+        url = self._build_url(endpoint)
+
+        try:
+            logger.debug(f"Making PATCH multipart request to {url}")
+
+            # For multipart requests, we need to use a client without the default
+            # Content-Type header so httpx can set it with the correct multipart boundary
+            # Create a temporary client with only Authorization header
+            temp_headers = {
+                "Authorization": f"Bearer {self.config.api_token}",
+                "User-Agent": self.config.user_agent,
+            }
+
+            async with httpx.AsyncClient(
+                base_url=self.config.server_url,
+                timeout=httpx.Timeout(self.config.timeout),
+                verify=self.config.verify_ssl,
+                headers=temp_headers,
+            ) as temp_client:
+                response = await temp_client.patch(url, files=files, data=data)
+
+            if response.status_code == 200:
+                try:
+                    data_response = response.json()
+                    return FleetResponse(
+                        success=True,
+                        data=data_response,
+                        message="Request successful",
+                        status_code=response.status_code,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to parse JSON response: {e}")
+                    return FleetResponse(
+                        success=True,
+                        data={"raw_response": response.text},
+                        message="Request successful (non-JSON response)",
+                        status_code=response.status_code,
+                    )
+
+            elif response.status_code == 401:
+                error_data = self._parse_error_response(response)
+                raise FleetAuthenticationError(
+                    "Authentication failed - check your API token",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            elif response.status_code == 404:
+                error_data = self._parse_error_response(response)
+                raise FleetNotFoundError(
+                    "Resource not found",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            elif response.status_code == 422:
+                error_data = self._parse_error_response(response)
+                raise FleetValidationError(
+                    f"Validation error: {error_data.get('message', 'Invalid request')}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            else:
+                error_data = self._parse_error_response(response)
+                raise FleetAPIError(
+                    f"API request failed with status {response.status_code}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+        except FleetAPIError:
+            raise
+        except Exception as e:
+            raise FleetAPIError(f"Multipart request failed: {str(e)}") from e
+
     # Health check
     async def health_check(self) -> FleetResponse:
         """Check if Fleet server is accessible and authentication works.
