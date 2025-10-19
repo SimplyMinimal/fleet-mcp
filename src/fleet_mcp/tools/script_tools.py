@@ -609,15 +609,23 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to run script: {error_details}",
                 "host_id": host_id,
                 "execution_id": None,
+                "error_details": e.response_data,
             }
         except FleetAPIError as e:
             logger.error(f"Failed to run script on host {host_id}: {e}")
             error_details = extract_error_details(e)
+
+            # Try to extract execution_id from response data even on error
+            execution_id = None
+            if e.response_data:
+                execution_id = e.response_data.get("execution_id")
+
             return {
                 "success": False,
                 "message": f"Failed to run script: {error_details}",
                 "host_id": host_id,
-                "execution_id": None,
+                "execution_id": execution_id,
+                "error_details": e.response_data,
             }
 
     @mcp.tool()
@@ -685,14 +693,22 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to run batch script: {error_details}",
                 "batch_execution_id": None,
+                "error_details": e.response_data,
             }
         except FleetAPIError as e:
             logger.error(f"Failed to run batch script: {e}")
             error_details = extract_error_details(e)
+
+            # Try to extract batch_execution_id from response data even on error
+            batch_execution_id = None
+            if e.response_data:
+                batch_execution_id = e.response_data.get("batch_execution_id")
+
             return {
                 "success": False,
                 "message": f"Failed to run batch script: {error_details}",
-                "batch_execution_id": None,
+                "batch_execution_id": batch_execution_id,
+                "error_details": e.response_data,
             }
 
     @mcp.tool()
