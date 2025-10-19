@@ -54,10 +54,12 @@ class TestServerHealthCheck:
         with open(cache_file, "w") as f:
             json.dump(mock_schema, f)
 
-        # Mock the cache file path
+        # Mock the cache file path and reset the global cache
         with patch(
             "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file
-        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir):
+        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir), patch(
+            "fleet_mcp.tools.table_discovery._table_cache", None
+        ):
             cache_info = await FleetMCPServer._get_cache_info()
 
             # Verify cache info structure
@@ -72,6 +74,17 @@ class TestServerHealthCheck:
             assert cache_info["cache_ttl_hours"] == 24
             assert "ago" in cache_info["last_modified"]
 
+            # Verify new fields
+            assert "schema_source" in cache_info
+            assert "errors" in cache_info
+            assert "warnings" in cache_info
+            assert "status" in cache_info
+
+            # Should have warning about low table count
+            assert cache_info["status"] == "warning"
+            assert len(cache_info["warnings"]) > 0
+            assert "Low table count" in cache_info["warnings"][0]
+
     @pytest.mark.asyncio
     async def test_get_cache_info_no_cache(self, tmp_path):
         """Test _get_cache_info when cache doesn't exist."""
@@ -81,7 +94,9 @@ class TestServerHealthCheck:
 
         with patch(
             "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file
-        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir):
+        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir), patch(
+            "fleet_mcp.tools.table_discovery._table_cache", None
+        ):
             # Mock the schema download to fail (so we don't create cache)
             with patch(
                 "fleet_mcp.tools.table_discovery.TableSchemaCache._download_fleet_schema",
@@ -108,6 +123,43 @@ class TestServerHealthCheck:
         assert FleetMCPServer._format_bytes(1073741824) == "1.00 GB"
 
     @pytest.mark.asyncio
+    async def test_get_cache_info_healthy_cache(self, tmp_path):
+        """Test _get_cache_info with a healthy cache (100+ tables)."""
+        # Create a mock cache file with many tables
+        cache_dir = tmp_path / ".fleet-mcp" / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / "osquery_fleet_schema.json"
+
+        # Generate 100 mock tables
+        mock_schema = {}
+        for i in range(100):
+            mock_schema[f"table_{i}"] = {
+                "description": f"Test table {i}",
+                "platforms": ["darwin", "linux", "windows"],
+                "columns": [{"name": "id", "type": "bigint"}],
+            }
+
+        with open(cache_file, "w") as f:
+            json.dump(mock_schema, f)
+
+        # Mock the cache file path and reset the global cache
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file
+        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir), patch(
+            "fleet_mcp.tools.table_discovery._table_cache", None
+        ):
+            cache_info = await FleetMCPServer._get_cache_info()
+
+            # Verify healthy status
+            assert cache_info["cached"] is True
+            assert cache_info["tables_loaded"] == 100
+            assert cache_info["status"] == "healthy"
+            assert len(cache_info["errors"]) == 0
+            # Should not have low table count warning
+            low_count_warnings = [w for w in cache_info["warnings"] if "Low table count" in w]
+            assert len(low_count_warnings) == 0
+
+    @pytest.mark.asyncio
     async def test_get_cache_info_error_handling(self):
         """Test that _get_cache_info handles errors gracefully."""
         # Mock get_table_cache to raise an exception
@@ -119,7 +171,10 @@ class TestServerHealthCheck:
 
             # Should return error info instead of crashing
             assert cache_info["cached"] is False
+            assert cache_info["status"] == "error"
             assert "error" in cache_info
             assert "Cache error" in cache_info["error"]
             assert "message" in cache_info
+            assert "errors" in cache_info
+            assert len(cache_info["errors"]) > 0
 

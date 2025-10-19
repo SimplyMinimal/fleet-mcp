@@ -229,6 +229,10 @@ class TestTableSchemaCache:
 
         cache = TableSchemaCache()
         cache.fleet_schemas = {"test_table": {}}
+        cache.fleet_schemas_loaded = True
+        cache.schema_source = "cache"
+        cache.loading_errors = []
+        cache.loading_warnings = []
 
         # Create a cache file
         with open(test_cache_file, "w") as f:
@@ -242,6 +246,18 @@ class TestTableSchemaCache:
             assert info["cache_size_bytes"] > 0
             assert info["loaded_schemas_count"] == 1
             assert info["cache_ttl_hours"] == 24
+
+            # Verify new fields
+            assert "schema_source" in info
+            assert info["schema_source"] == "cache"
+            assert "loading_errors" in info
+            assert "loading_warnings" in info
+            assert isinstance(info["loading_errors"], list)
+            assert isinstance(info["loading_warnings"], list)
+
+            # Should have warning about low table count
+            assert len(info["loading_warnings"]) > 0
+            assert any("Low table count" in w for w in info["loading_warnings"])
 
     @pytest.mark.asyncio
     async def test_refresh_fleet_schemas(self, mock_schema_json):

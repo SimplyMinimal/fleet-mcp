@@ -196,7 +196,20 @@ class FleetMCPServer:
                     if raw_info["cache_age_hours"] is not None
                     else "Never"
                 ),
+                "schema_source": raw_info["schema_source"],
+                "errors": raw_info["loading_errors"],
+                "warnings": raw_info["loading_warnings"],
             }
+
+            # Add a status field for quick assessment
+            if raw_info["loading_errors"]:
+                cache_info["status"] = "error"
+            elif raw_info["loading_warnings"]:
+                cache_info["status"] = "warning"
+            elif raw_info["loaded_schemas_count"] >= 50:
+                cache_info["status"] = "healthy"
+            else:
+                cache_info["status"] = "degraded"
 
             return cache_info
 
@@ -204,8 +217,11 @@ class FleetMCPServer:
             logger.warning(f"Failed to get cache info: {e}")
             return {
                 "cached": False,
+                "status": "error",
                 "error": str(e),
                 "message": "Failed to retrieve cache information",
+                "errors": [str(e)],
+                "warnings": [],
             }
 
     def _register_health_check(self) -> None:

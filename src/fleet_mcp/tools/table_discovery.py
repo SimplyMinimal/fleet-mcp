@@ -50,6 +50,11 @@ class TableSchemaCache:
         self.cache_ttl = 3600  # 1 hour for host tables
         self.schema_cache_ttl = SCHEMA_CACHE_TTL  # 24 hours for Fleet schemas
 
+        # Track loading status and errors
+        self.schema_source: str | None = None  # "cache", "download", "bundled", or None
+        self.loading_errors: list[str] = []  # List of error messages encountered
+        self.loading_warnings: list[str] = []  # List of warning messages encountered
+
     async def initialize(self, force_refresh: bool = False) -> None:
         """Initialize the cache by loading Fleet schemas.
 
@@ -74,6 +79,11 @@ class TableSchemaCache:
         """
         logger.info("Loading Fleet table schemas...")
 
+        # Clear previous errors/warnings
+        self.loading_errors.clear()
+        self.loading_warnings.clear()
+        self.schema_source = None
+
         # Ensure cache directory exists
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -85,19 +95,23 @@ class TableSchemaCache:
                     schemas = await self._load_cached_schema()
                     if schemas:
                         self.fleet_schemas = schemas
+                        self.schema_source = "cache"
                         logger.info(
                             f"Loaded {len(schemas)} table schemas from cache "
                             f"(age: {cache_age/3600:.1f} hours)"
                         )
                         return
                 except Exception as e:
-                    logger.warning(f"Failed to load cached schema: {e}")
+                    error_msg = f"Failed to load cached schema: {e}"
+                    logger.warning(error_msg)
+                    self.loading_warnings.append(error_msg)
 
         # Try to download fresh schema
         try:
             schemas = await self._download_fleet_schema()
             if schemas:
                 self.fleet_schemas = schemas
+                self.schema_source = "download"
                 # Save to cache
                 await self._save_schema_cache(schemas)
                 logger.info(
@@ -105,7 +119,9 @@ class TableSchemaCache:
                 )
                 return
         except Exception as e:
-            logger.warning(f"Failed to download Fleet schema: {e}")
+            error_msg = f"Failed to download Fleet schema: {e}"
+            logger.warning(error_msg)
+            self.loading_warnings.append(error_msg)
 
         # Fall back to cached version (even if expired)
         if SCHEMA_CACHE_FILE.exists():
@@ -113,25 +129,36 @@ class TableSchemaCache:
                 schemas = await self._load_cached_schema()
                 if schemas:
                     self.fleet_schemas = schemas
-                    logger.warning(
+                    self.schema_source = "cache_stale"
+                    warning_msg = (
                         f"Using stale cached schema ({len(schemas)} tables) - "
                         "download failed"
                     )
+                    logger.warning(warning_msg)
+                    self.loading_warnings.append(warning_msg)
                     return
             except Exception as e:
-                logger.error(f"Failed to load stale cache: {e}")
+                error_msg = f"Failed to load stale cache: {e}"
+                logger.error(error_msg)
+                self.loading_errors.append(error_msg)
 
         # Last resort: fall back to bundled schemas
         try:
             schemas = await self._load_bundled_schemas()
             self.fleet_schemas = schemas
-            logger.warning(
+            self.schema_source = "bundled"
+            warning_msg = (
                 f"Using bundled fallback schemas ({len(schemas)} tables) - "
                 "no cache available"
             )
+            logger.warning(warning_msg)
+            self.loading_warnings.append(warning_msg)
         except Exception as e:
-            logger.error(f"Failed to load bundled schemas: {e}")
+            error_msg = f"Failed to load bundled schemas: {e}"
+            logger.error(error_msg)
+            self.loading_errors.append(error_msg)
             self.fleet_schemas = {}
+            self.schema_source = "none"
 
     async def _download_fleet_schema(self) -> dict[str, dict[str, Any]]:
         """Download the official Fleet osquery schema JSON file.
@@ -539,6 +566,24 @@ class TableSchemaCache:
             cache_age = time.time() - SCHEMA_CACHE_FILE.stat().st_mtime
             cache_size = SCHEMA_CACHE_FILE.stat().st_size
 
+        # Detect potential issues
+        table_count = len(self.fleet_schemas)
+        warnings = list(self.loading_warnings)  # Copy the list
+
+        # Add warning if table count is unexpectedly low
+        if table_count > 0 and table_count < 50:
+            warnings.append(
+                f"Low table count ({table_count} tables) - expected 100+ tables. "
+                "Cache may be incomplete or using test data."
+            )
+
+        # Add warning if no schemas loaded at all
+        if table_count == 0 and self.fleet_schemas_loaded:
+            warnings.append(
+                "No schemas loaded - all loading attempts failed. "
+                "Check network connectivity and cache file."
+            )
+
         return {
             "schema_cache_file": str(SCHEMA_CACHE_FILE),
             "cache_exists": cache_exists,
@@ -550,8 +595,11 @@ class TableSchemaCache:
             "is_cache_valid": (
                 cache_age < self.schema_cache_ttl if cache_age else False
             ),
-            "loaded_schemas_count": len(self.fleet_schemas),
+            "loaded_schemas_count": table_count,
             "cached_hosts_count": len(self.host_tables),
+            "schema_source": self.schema_source,
+            "loading_errors": list(self.loading_errors),  # Copy the list
+            "loading_warnings": warnings,
         }
 
 
