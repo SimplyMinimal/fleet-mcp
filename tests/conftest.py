@@ -9,6 +9,16 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import shared fixtures so they're available to all tests
+from tests.fixtures.fleet_fixtures import (  # noqa: F401
+    live_fleet_client,
+    live_fleet_config,
+    sample_host_data,
+    sample_policy_data,
+    sample_query_data,
+    test_fleet_client,
+    test_fleet_config,
+    test_fleet_config_write_mode,
+)
 
 
 def pytest_configure(config):
