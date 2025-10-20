@@ -27,19 +27,37 @@ class FleetAPIError(Exception):
 
 
 class FleetAuthenticationError(FleetAPIError):
-    """Authentication failed with Fleet API."""
+    """Authentication failed with Fleet API (401 Unauthorized)."""
+
+    pass
+
+
+class FleetPermissionError(FleetAPIError):
+    """Permission denied or feature disabled (403 Forbidden)."""
 
     pass
 
 
 class FleetNotFoundError(FleetAPIError):
-    """Resource not found in Fleet."""
+    """Resource not found in Fleet (404 Not Found)."""
+
+    pass
+
+
+class FleetConflictError(FleetAPIError):
+    """Resource conflict (409 Conflict)."""
 
     pass
 
 
 class FleetValidationError(FleetAPIError):
-    """Validation error from Fleet API."""
+    """Validation or business logic error (422 Unprocessable Entity)."""
+
+    pass
+
+
+class FleetBadRequestError(FleetAPIError):
+    """Bad request or malformed input (400 Bad Request)."""
 
     pass
 
@@ -155,23 +173,38 @@ class FleetClient:
             )
 
             # Handle different response status codes
-            if response.status_code == 200:
+            if response.status_code == 200 or response.status_code == 202:
                 try:
                     data = response.json()
+                    message = "Request successful"
+                    if response.status_code == 202:
+                        message = "Request accepted (queued for processing)"
                     return FleetResponse(
                         success=True,
                         data=data,
-                        message="Request successful",
+                        message=message,
                         status_code=response.status_code,
                     )
                 except Exception as e:
                     logger.warning(f"Failed to parse JSON response: {e}")
+                    message = "Request successful (non-JSON response)"
+                    if response.status_code == 202:
+                        message = "Request accepted (non-JSON response)"
                     return FleetResponse(
                         success=True,
                         data={"raw_response": response.text},
-                        message="Request successful (non-JSON response)",
+                        message=message,
                         status_code=response.status_code,
                     )
+
+            elif response.status_code == 400:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Bad request - malformed input")
+                raise FleetBadRequestError(
+                    f"Bad request: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
 
             elif response.status_code == 401:
                 error_data = self._parse_error_response(response)
@@ -181,26 +214,47 @@ class FleetClient:
                     response_data=error_data,
                 )
 
+            elif response.status_code == 403:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Permission denied or feature disabled")
+                raise FleetPermissionError(
+                    f"Forbidden: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
             elif response.status_code == 404:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Resource not found")
                 raise FleetNotFoundError(
-                    "Resource not found",
+                    f"Not found: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            elif response.status_code == 409:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Resource conflict")
+                raise FleetConflictError(
+                    f"Conflict: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
 
             elif response.status_code == 422:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Invalid request")
                 raise FleetValidationError(
-                    f"Validation error: {error_data.get('message', 'Invalid request')}",
+                    f"Validation error: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
 
             else:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", f"Request failed with status {response.status_code}")
                 raise FleetAPIError(
-                    f"API request failed with status {response.status_code}",
+                    f"API error: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
@@ -323,23 +377,38 @@ class FleetClient:
             ) as temp_client:
                 response = await temp_client.post(url, files=files, data=data)
 
-            if response.status_code == 200:
+            if response.status_code == 200 or response.status_code == 202:
                 try:
                     data_response = response.json()
+                    message = "Request successful"
+                    if response.status_code == 202:
+                        message = "Request accepted (queued for processing)"
                     return FleetResponse(
                         success=True,
                         data=data_response,
-                        message="Request successful",
+                        message=message,
                         status_code=response.status_code,
                     )
                 except Exception as e:
                     logger.warning(f"Failed to parse JSON response: {e}")
+                    message = "Request successful (non-JSON response)"
+                    if response.status_code == 202:
+                        message = "Request accepted (non-JSON response)"
                     return FleetResponse(
                         success=True,
                         data={"raw_response": response.text},
-                        message="Request successful (non-JSON response)",
+                        message=message,
                         status_code=response.status_code,
                     )
+
+            elif response.status_code == 400:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Bad request - malformed input")
+                raise FleetBadRequestError(
+                    f"Bad request: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
 
             elif response.status_code == 401:
                 error_data = self._parse_error_response(response)
@@ -349,27 +418,48 @@ class FleetClient:
                     response_data=error_data,
                 )
 
+            elif response.status_code == 403:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Permission denied or feature disabled")
+                raise FleetPermissionError(
+                    f"Forbidden: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
             elif response.status_code == 404:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Resource not found")
                 raise FleetNotFoundError(
-                    "Resource not found",
+                    f"Not found: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            elif response.status_code == 409:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Resource conflict")
+                raise FleetConflictError(
+                    f"Conflict: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
 
             elif response.status_code == 422:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Invalid request")
                 raise FleetValidationError(
-                    f"Validation error: {error_data.get('message', 'Invalid request')}",
+                    f"Validation error: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
 
             else:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", f"Request failed with status {response.status_code}")
                 logger.error(f"POST multipart failed with status {response.status_code}: {error_data}")
                 raise FleetAPIError(
-                    f"API request failed with status {response.status_code}",
+                    f"API error: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
@@ -420,23 +510,38 @@ class FleetClient:
             ) as temp_client:
                 response = await temp_client.patch(url, files=files, data=data)
 
-            if response.status_code == 200:
+            if response.status_code == 200 or response.status_code == 202:
                 try:
                     data_response = response.json()
+                    message = "Request successful"
+                    if response.status_code == 202:
+                        message = "Request accepted (queued for processing)"
                     return FleetResponse(
                         success=True,
                         data=data_response,
-                        message="Request successful",
+                        message=message,
                         status_code=response.status_code,
                     )
                 except Exception as e:
                     logger.warning(f"Failed to parse JSON response: {e}")
+                    message = "Request successful (non-JSON response)"
+                    if response.status_code == 202:
+                        message = "Request accepted (non-JSON response)"
                     return FleetResponse(
                         success=True,
                         data={"raw_response": response.text},
-                        message="Request successful (non-JSON response)",
+                        message=message,
                         status_code=response.status_code,
                     )
+
+            elif response.status_code == 400:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Bad request - malformed input")
+                raise FleetBadRequestError(
+                    f"Bad request: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
 
             elif response.status_code == 401:
                 error_data = self._parse_error_response(response)
@@ -446,26 +551,47 @@ class FleetClient:
                     response_data=error_data,
                 )
 
+            elif response.status_code == 403:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Permission denied or feature disabled")
+                raise FleetPermissionError(
+                    f"Forbidden: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
             elif response.status_code == 404:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Resource not found")
                 raise FleetNotFoundError(
-                    "Resource not found",
+                    f"Not found: {error_msg}",
+                    status_code=response.status_code,
+                    response_data=error_data,
+                )
+
+            elif response.status_code == 409:
+                error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Resource conflict")
+                raise FleetConflictError(
+                    f"Conflict: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
 
             elif response.status_code == 422:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", "Invalid request")
                 raise FleetValidationError(
-                    f"Validation error: {error_data.get('message', 'Invalid request')}",
+                    f"Validation error: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
 
             else:
                 error_data = self._parse_error_response(response)
+                error_msg = error_data.get("message", f"Request failed with status {response.status_code}")
                 raise FleetAPIError(
-                    f"API request failed with status {response.status_code}",
+                    f"API error: {error_msg}",
                     status_code=response.status_code,
                     response_data=error_data,
                 )
