@@ -94,17 +94,27 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     async def fleet_get_query_report(
         query_id: int, team_id: int | None = None
     ) -> dict[str, Any]:
-        """Get the latest results from a scheduled query.
+        """Get the latest stored results from a SCHEDULED query.
 
-        This retrieves the stored results from the last time a scheduled query ran.
-        For live/ad-hoc queries, use fleet_run_live_query instead.
+        IMPORTANT: This tool ONLY works for scheduled queries (queries with an
+        'interval' set that run periodically). It retrieves the stored results
+        from the last time the scheduled query ran.
+
+        This tool does NOT work for:
+        - Live query campaigns created by fleet_run_live_query()
+        - Ad-hoc queries that haven't been saved and scheduled
+        - Queries that don't have 'interval' configured
+
+        For running ad-hoc queries and getting results, use:
+        - fleet_query_host(host_id, query) - Run query on ONE host and get results
+        - fleet_query_host_by_identifier(identifier, query) - Run query by hostname/UUID
 
         Args:
-            query_id: ID of the saved query
+            query_id: ID of the saved SCHEDULED query
             team_id: Optional team ID to filter results to hosts in that team
 
         Returns:
-            Dict containing query results from all hosts that ran the query.
+            Dict containing stored query results from all hosts that ran the query.
         """
         try:
             async with client:
@@ -260,7 +270,22 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         label_ids: list[int] | None = None,
         team_ids: list[int] | None = None,
     ) -> dict[str, Any]:
-        """Execute a live query against specified hosts.
+        """Execute a live query campaign against specified hosts.
+
+        IMPORTANT: This tool creates an asynchronous query campaign but does NOT
+        wait for or return query results. The campaign runs in the background and
+        results are streamed via WebSocket (not accessible through this tool).
+
+        For getting query results, use one of these alternatives instead:
+        - fleet_query_host(host_id, query) - Run query on ONE host and get results
+        - fleet_query_host_by_identifier(identifier, query) - Run query by hostname/UUID
+        - Create a scheduled query with fleet_create_query() and use
+          fleet_get_query_report() to retrieve stored results later
+
+        This tool is primarily useful for:
+        - Triggering background query campaigns across many hosts
+        - Getting campaign metadata (campaign_id, targeted hosts count)
+        - Monitoring campaign status (online/offline hosts)
 
         Args:
             query: SQL query string to execute
@@ -269,7 +294,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             team_ids: List of team IDs to target hosts
 
         Returns:
-            Dict containing campaign information and initial status.
+            Dict containing campaign information and initial status (NO RESULTS).
         """
         try:
             async with client:
@@ -287,12 +312,23 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 if response.success and response.data:
                     campaign = response.data.get("campaign", {})
+                    campaign_id = campaign.get("id")
+                    metrics = campaign.get("Metrics", {})
+
                     return {
                         "success": True,
                         "campaign": campaign,
-                        "campaign_id": campaign.get("id"),
+                        "campaign_id": campaign_id,
                         "query": query,
-                        "message": f"Started live query campaign {campaign.get('id')}",
+                        "message": (
+                            f"Started live query campaign {campaign_id}. "
+                            f"Targeted {metrics.get('TotalHosts', 0)} hosts "
+                            f"({metrics.get('OnlineHosts', 0)} online, "
+                            f"{metrics.get('OfflineHosts', 0)} offline). "
+                            "NOTE: This tool does NOT return query results. "
+                            "Use fleet_query_host() or fleet_query_host_by_identifier() "
+                            "to run queries and get results."
+                        ),
                     }
                 else:
                     return {
