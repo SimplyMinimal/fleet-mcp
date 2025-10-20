@@ -286,6 +286,54 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
+    async def fleet_get_cve(cve: str, team_id: int | None = None) -> dict[str, Any]:
+        """Get detailed information about a specific CVE.
+
+        Returns comprehensive information about a CVE including affected
+        software, OS versions, and hosts.
+
+        Args:
+            cve: CVE identifier (e.g., CVE-2021-44228)
+            team_id: Optional team ID to filter results
+
+        Returns:
+            Dict containing CVE details, affected software, and OS versions.
+        """
+        try:
+            async with client:
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+
+                response = await client.get(
+                    f"/api/latest/fleet/vulnerabilities/{cve}",
+                    params=params if params else None,
+                )
+                data = response.data or {}
+                vulnerability = data.get("vulnerability", {})
+                software = data.get("software", [])
+                os_versions = data.get("os_versions", [])
+
+                return {
+                    "success": True,
+                    "message": f"Retrieved CVE {cve}",
+                    "data": {
+                        "vulnerability": vulnerability,
+                        "software": software,
+                        "os_versions": os_versions,
+                        "affected_software_count": len(software),
+                        "affected_os_count": len(os_versions),
+                    },
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to get CVE {cve}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get CVE: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
     async def fleet_search_software(
         query: str,
         limit: int = 50,

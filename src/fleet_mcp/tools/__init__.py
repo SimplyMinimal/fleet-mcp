@@ -1,6 +1,7 @@
 """Fleet MCP Tools - MCP tool implementations for Fleet DM operations."""
 
 from . import (
+    activity_tools,
     carve_tools,
     config_tools,
     host_tools,
@@ -16,10 +17,12 @@ from . import (
     software_tools,
     table_tools,
     team_tools,
+    user_tools,
     vpp_tools,
 )
 
 __all__ = [
+    "activity_tools",
     "carve_tools",
     "config_tools",
     "host_tools",
@@ -35,5 +38,6 @@ __all__ = [
     "software_tools",
     "table_tools",
     "team_tools",
+    "user_tools",
     "vpp_tools",
 ]
