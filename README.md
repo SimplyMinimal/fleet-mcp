@@ -396,7 +396,32 @@ For other MCP-compatible clients, use this general pattern:
 4. **Token Rotation**: Regularly rotate Fleet API tokens
 5. **Environment-Specific Configs**: Use separate configs for dev/prod
 
+## Licensing
 
+Fleet MCP uses a **dual-use licensing model**:
+
+- **Free for Development & Testing**: Use Fleet MCP without restrictions for local development, testing, evaluation, and non-commercial purposes
+- **Commercial License Required for Production**: Any production deployment or commercial use requires a registered commercial license
+
+### Quick Reference
+
+| Scenario | License Required |
+|----------|------------------|
+| Local development | ❌ No |
+| Testing & evaluation | ❌ No |
+| Commercial testing (14 days max) | ❌ No |
+| Production deployment | ✅ Yes |
+| Commercial services | ✅ Yes |
+
+### Learn More
+
+For detailed information about licensing, including:
+- When a license is required vs. optional
+- Examples of development vs. production use
+- How to obtain a commercial license
+- Frequently asked questions
+
+See the [LICENSING.md](LICENSING.md) file.
 
 ## Available Tools
 

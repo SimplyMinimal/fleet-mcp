@@ -1,21 +1,69 @@
-MIT License
+Fleet MCP Dual-Use License
 
 Copyright (c) 2025 Fleet MCP Contributors
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+TERMS AND CONDITIONS
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. DEVELOPMENT AND TESTING USE (FREE)
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+   You are free to use Fleet MCP without restriction for:
+   - Local development and testing on your personal computer
+   - Evaluation and proof-of-concept projects
+   - Internal testing within your organization
+   - Learning and educational purposes
+   - Non-commercial research
+
+   No license key is required for these uses.
+
+2. COMMERCIAL AND PRODUCTION USE (LICENSED)
+
+   Any deployment or use of Fleet MCP in a commercial or production
+   environment requires a valid commercial license. This includes:
+   - Deployed services accessible to external users
+   - Production environments managing live systems
+   - Commercial offerings or services
+   - Revenue-generating applications
+   - SaaS or hosted deployments
+
+   See LICENSING.md for details on obtaining a commercial license.
+
+3. MIT LICENSE FOR DEVELOPMENT USE
+
+   For development, testing, and evaluation purposes, Fleet MCP is
+   provided under the MIT License:
+
+   Permission is hereby granted, free of charge, to any person obtaining
+   a copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be included
+   in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+4. COMMERCIAL LICENSE TERMS
+
+   Commercial use requires a registered license. Commercial licenses are
+   subject to separate terms and conditions. Contact the Fleet MCP team
+   for licensing inquiries.
+
+5. DEFINITIONS
+
+   - "Development Use": Use on a local machine, internal testing, or
+     evaluation purposes
+   - "Production Use": Any deployment where the software is used to
+     provide services to external users or manage live systems
+   - "Commercial Use": Any use where the software is part of a
+     revenue-generating activity or commercial service
+
+For more information, see LICENSING.md
