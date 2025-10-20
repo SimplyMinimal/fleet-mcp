@@ -316,34 +316,35 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to update user: {str(e)}",
                 "data": None,
             }
+        
+    # TODO: Disabled for now as it is too dangerous. Revisit later if really needed.
+    # @mcp.tool()
+    # async def fleet_delete_user(user_id: int) -> dict[str, Any]:
+    #     """Delete a user from Fleet.
 
-    @mcp.tool()
-    async def fleet_delete_user(user_id: int) -> dict[str, Any]:
-        """Delete a user from Fleet.
+    #     Permanently removes a user from the system.
 
-        Permanently removes a user from the system.
+    #     Args:
+    #         user_id: ID of the user to delete
 
-        Args:
-            user_id: ID of the user to delete
-
-        Returns:
-            Dict containing the result of the deletion.
-        """
-        try:
-            async with client:
-                await client.delete(f"/api/latest/fleet/users/{user_id}")
-                return {
-                    "success": True,
-                    "message": f"Deleted user {user_id}",
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete user {user_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete user: {str(e)}",
-                "data": None,
-            }
+    #     Returns:
+    #         Dict containing the result of the deletion.
+    #     """
+    #     try:
+    #         async with client:
+    #             await client.delete(f"/api/latest/fleet/users/{user_id}")
+    #             return {
+    #                 "success": True,
+    #                 "message": f"Deleted user {user_id}",
+    #                 "data": None,
+    #             }
+    #     except FleetAPIError as e:
+    #         logger.error(f"Failed to delete user {user_id}: {e}")
+    #         return {
+    #             "success": False,
+    #             "message": f"Failed to delete user: {str(e)}",
+    #             "data": None,
+    #         }
 
     @mcp.tool()
     async def fleet_delete_session(session_id: int) -> dict[str, Any]:
@@ -401,46 +402,47 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "data": None,
             }
 
-    @mcp.tool()
-    async def fleet_require_password_reset(
-        user_id: int, require: bool = True
-    ) -> dict[str, Any]:
-        """Require a user to reset their password on next login.
+    # TODO: Disabled for now as it is too dangerous. Revisit later if really needed.
+    # @mcp.tool()
+    # async def fleet_require_password_reset(
+    #     user_id: int, require: bool = True
+    # ) -> dict[str, Any]:
+    #     """Require a user to reset their password on next login.
 
-        This forces a user to change their password the next time they log in.
+    #     This forces a user to change their password the next time they log in.
 
-        Args:
-            user_id: ID of the user
-            require: Whether to require password reset (default: True)
+    #     Args:
+    #         user_id: ID of the user
+    #         require: Whether to require password reset (default: True)
 
-        Returns:
-            Dict indicating success or failure of the operation.
+    #     Returns:
+    #         Dict indicating success or failure of the operation.
 
-        Example:
-            >>> result = await fleet_require_password_reset(user_id=10)
-            >>> print(result["message"])
-        """
-        try:
-            async with client:
-                json_data = {"require": require}
-                response = await client.post(
-                    f"/users/{user_id}/require_password_reset", json_data=json_data
-                )
+    #     Example:
+    #         >>> result = await fleet_require_password_reset(user_id=10)
+    #         >>> print(result["message"])
+    #     """
+    #     try:
+    #         async with client:
+    #             json_data = {"require": require}
+    #             response = await client.post(
+    #                 f"/users/{user_id}/require_password_reset", json_data=json_data
+    #             )
 
-                return {
-                    "success": response.success,
-                    "message": response.message
-                    or f"Password reset {'required' if require else 'not required'} for user {user_id}",
-                    "user_id": user_id,
-                    "require": require,
-                }
+    #             return {
+    #                 "success": response.success,
+    #                 "message": response.message
+    #                 or f"Password reset {'required' if require else 'not required'} for user {user_id}",
+    #                 "user_id": user_id,
+    #                 "require": require,
+    #             }
 
-        except FleetAPIError as e:
-            logger.error(f"Failed to require password reset for user {user_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to require password reset: {str(e)}",
-                "user_id": user_id,
-                "require": require,
-            }
+    #     except FleetAPIError as e:
+    #         logger.error(f"Failed to require password reset for user {user_id}: {e}")
+    #         return {
+    #             "success": False,
+    #             "message": f"Failed to require password reset: {str(e)}",
+    #             "user_id": user_id,
+    #             "require": require,
+    #         }
 
