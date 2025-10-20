@@ -141,16 +141,18 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         description: str = "",
         query: str = "",
         platform: str = "",
-        label_type: str = "regular",
     ) -> dict[str, Any]:
         """Create a new label in Fleet.
+
+        Labels can be either dynamic (query-based) or manual (host list-based).
+        - For dynamic labels: provide a query
+        - For manual labels: leave query empty and use fleet_update_label to add hosts
 
         Args:
             name: Name of the label (required)
             description: Description of the label
-            query: SQL query for dynamic labels (optional for manual labels)
+            query: SQL query for dynamic labels (leave empty for manual labels)
             platform: Target platform (darwin, windows, linux, chrome, or empty for all)
-            label_type: Type of label (regular, builtin)
 
         Returns:
             Dict containing the created label information.
