@@ -401,3 +401,46 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "data": None,
             }
 
+    @mcp.tool()
+    async def fleet_require_password_reset(
+        user_id: int, require: bool = True
+    ) -> dict[str, Any]:
+        """Require a user to reset their password on next login.
+
+        This forces a user to change their password the next time they log in.
+
+        Args:
+            user_id: ID of the user
+            require: Whether to require password reset (default: True)
+
+        Returns:
+            Dict indicating success or failure of the operation.
+
+        Example:
+            >>> result = await fleet_require_password_reset(user_id=10)
+            >>> print(result["message"])
+        """
+        try:
+            async with client:
+                json_data = {"require": require}
+                response = await client.post(
+                    f"/users/{user_id}/require_password_reset", json_data=json_data
+                )
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Password reset {'required' if require else 'not required'} for user {user_id}",
+                    "user_id": user_id,
+                    "require": require,
+                }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to require password reset for user {user_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to require password reset: {str(e)}",
+                "user_id": user_id,
+                "require": require,
+            }
+

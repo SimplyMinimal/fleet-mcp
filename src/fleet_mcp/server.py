@@ -11,6 +11,7 @@ from .tools import (
     activity_tools,
     carve_tools,
     config_tools,
+    device_tools,
     host_tools,
     invite_tools,
     label_tools,
@@ -142,6 +143,9 @@ class FleetMCPServer:
         vpp_tools.register_read_tools(self.mcp, self.client)
         user_tools.register_read_tools(self.mcp, self.client)
         activity_tools.register_read_tools(self.mcp, self.client)
+        device_tools.register_tools(
+            self.mcp, self.client
+        )  # Device tools are all read-only
 
         # Register SELECT-only query tools if in readonly mode with allow_select_queries
         if self.config.readonly and self.config.allow_select_queries:

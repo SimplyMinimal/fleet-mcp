@@ -679,3 +679,69 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to install software: {str(e)}",
                 "data": None,
             }
+
+    @mcp.tool()
+    async def fleet_batch_set_software(
+        team_id: int | None,
+        software: list[dict[str, Any]],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Batch upload/set software installers for a team.
+
+        This endpoint is asynchronous - it starts the process of downloading and
+        uploading software installers in the background and returns a request UUID
+        to query the status.
+
+        Args:
+            team_id: ID of the team (None for no team)
+            software: List of software items with url, install_script, etc.
+            dry_run: If True, validate without making changes
+
+        Returns:
+            Dict containing the request UUID to check status.
+
+        Example:
+            >>> software = [
+            ...     {
+            ...         "url": "https://example.com/app.pkg",
+            ...         "install_script": "installer -pkg app.pkg -target /",
+            ...         "pre_install_query": "SELECT 1 FROM apps WHERE name = 'App';",
+            ...         "post_install_script": "echo 'Installed'",
+            ...         "self_service": False
+            ...     }
+            ... ]
+            >>> result = await fleet_batch_set_software(team_id=1, software=software)
+            >>> request_uuid = result["request_uuid"]
+        """
+        try:
+            async with client:
+                json_data: dict[str, Any] = {"software": software}
+                if team_id is not None:
+                    json_data["team_id"] = team_id
+                if dry_run:
+                    json_data["dry_run"] = dry_run
+
+                response = await client.post("/software/batch", json_data=json_data)
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "request_uuid": response.data.get("request_uuid"),
+                        "message": "Batch software upload initiated. Use request_uuid to check status.",
+                        "team_id": team_id,
+                        "software_count": len(software),
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "request_uuid": None,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to batch set software: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to batch set software: {str(e)}",
+                "request_uuid": None,
+            }

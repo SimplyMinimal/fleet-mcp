@@ -440,6 +440,142 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "host_id": host_id,
             }
 
+    @mcp.tool()
+    async def fleet_get_host_macadmins(host_id: int) -> dict[str, Any]:
+        """Get macadmins data (Munki, MDM profiles) for a specific host.
+
+        This endpoint returns macadmins-related data including Munki info and MDM profiles.
+
+        Args:
+            host_id: ID of the host
+
+        Returns:
+            Dict containing macadmins data for the host.
+
+        Example:
+            >>> result = await fleet_get_host_macadmins(host_id=123)
+            >>> print(result["macadmins"]["munki_info"]["version"])
+        """
+        try:
+            async with client:
+                response = await client.get(f"/hosts/{host_id}/macadmins")
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "host_id": host_id,
+                        "macadmins": response.data.get("macadmins", {}),
+                        "message": f"Retrieved macadmins data for host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "host_id": host_id,
+                        "macadmins": {},
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to get macadmins data for host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get macadmins data: {str(e)}",
+                "host_id": host_id,
+                "macadmins": {},
+            }
+
+    @mcp.tool()
+    async def fleet_get_host_device_mapping(host_id: int) -> dict[str, Any]:
+        """Get device mapping information for a specific host.
+
+        Device mapping associates a host with a user email address.
+
+        Args:
+            host_id: ID of the host
+
+        Returns:
+            Dict containing device mapping information.
+
+        Example:
+            >>> result = await fleet_get_host_device_mapping(host_id=123)
+            >>> print(result["device_mapping"])
+        """
+        try:
+            async with client:
+                response = await client.get(f"/hosts/{host_id}/device_mapping")
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "host_id": host_id,
+                        "device_mapping": response.data.get("device_mapping", []),
+                        "count": len(response.data.get("device_mapping", [])),
+                        "message": f"Retrieved device mapping for host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "host_id": host_id,
+                        "device_mapping": [],
+                        "count": 0,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to get device mapping for host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get device mapping: {str(e)}",
+                "host_id": host_id,
+                "device_mapping": [],
+                "count": 0,
+            }
+
+    @mcp.tool()
+    async def fleet_get_host_encryption_key(host_id: int) -> dict[str, Any]:
+        """Get disk encryption recovery key for a specific host.
+
+        This endpoint retrieves the FileVault or BitLocker recovery key for a host.
+        Requires MDM enrollment and disk encryption to be enabled.
+
+        Args:
+            host_id: ID of the host
+
+        Returns:
+            Dict containing the encryption recovery key.
+
+        Example:
+            >>> result = await fleet_get_host_encryption_key(host_id=123)
+            >>> print(result["encryption_key"]["key"])
+        """
+        try:
+            async with client:
+                response = await client.get(f"/hosts/{host_id}/encryption_key")
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "host_id": host_id,
+                        "encryption_key": response.data.get("encryption_key", {}),
+                        "message": f"Retrieved encryption key for host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "host_id": host_id,
+                        "encryption_key": {},
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to get encryption key for host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get encryption key: {str(e)}",
+                "host_id": host_id,
+                "encryption_key": {},
+            }
+
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register write host management tools with the MCP server.
@@ -856,5 +992,41 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             return {
                 "success": False,
                 "message": f"Failed to remove labels from host: {str(e)}",
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_refetch_host(host_id: int) -> dict[str, Any]:
+        """Force a host to refetch and update its data immediately.
+
+        This triggers the host to immediately report its current state to Fleet,
+        updating information like installed software, OS version, and other details.
+
+        Args:
+            host_id: ID of the host to refetch
+
+        Returns:
+            Dict indicating success or failure of the refetch request.
+
+        Example:
+            >>> result = await fleet_refetch_host(host_id=123)
+            >>> print(result["message"])
+        """
+        try:
+            async with client:
+                response = await client.post(f"/hosts/{host_id}/refetch", json_data={})
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Refetch requested for host {host_id}",
+                    "host_id": host_id,
+                }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to refetch host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to refetch host: {str(e)}",
                 "host_id": host_id,
             }

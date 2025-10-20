@@ -318,6 +318,98 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "count": 0,
             }
 
+    @mcp.tool()
+    async def fleet_list_team_users(team_id: int) -> dict[str, Any]:
+        """List all users that are members of a specific team.
+
+        Args:
+            team_id: ID of the team
+
+        Returns:
+            Dict containing list of users in the team.
+
+        Example:
+            >>> result = await fleet_list_team_users(team_id=1)
+            >>> print(result["users"])
+        """
+        try:
+            async with client:
+                response = await client.get(f"/teams/{team_id}/users")
+
+                if response.success and response.data:
+                    users = response.data.get("users", [])
+                    return {
+                        "success": True,
+                        "team_id": team_id,
+                        "users": users,
+                        "count": len(users),
+                        "message": f"Found {len(users)} users in team {team_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "team_id": team_id,
+                        "users": [],
+                        "count": 0,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to list users for team {team_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list team users: {str(e)}",
+                "team_id": team_id,
+                "users": [],
+                "count": 0,
+            }
+
+    @mcp.tool()
+    async def fleet_get_team_secrets(team_id: int) -> dict[str, Any]:
+        """List team-specific enroll secrets.
+
+        Args:
+            team_id: ID of the team
+
+        Returns:
+            Dict containing team enroll secrets.
+
+        Example:
+            >>> result = await fleet_get_team_secrets(team_id=1)
+            >>> print(result["secrets"])
+        """
+        try:
+            async with client:
+                response = await client.get(f"/teams/{team_id}/secrets")
+
+                if response.success and response.data:
+                    secrets = response.data.get("secrets", [])
+                    return {
+                        "success": True,
+                        "team_id": team_id,
+                        "secrets": secrets,
+                        "count": len(secrets),
+                        "message": f"Found {len(secrets)} secrets for team {team_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "team_id": team_id,
+                        "secrets": [],
+                        "count": 0,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to get secrets for team {team_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get team secrets: {str(e)}",
+                "team_id": team_id,
+                "secrets": [],
+                "count": 0,
+            }
+
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register write team and user management tools with the MCP server.
@@ -365,4 +457,86 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to create team: {str(e)}",
                 "team": None,
+            }
+
+    @mcp.tool()
+    async def fleet_add_team_users(
+        team_id: int, user_ids: list[int]
+    ) -> dict[str, Any]:
+        """Add one or more users to a specific team.
+
+        Args:
+            team_id: ID of the team
+            user_ids: List of user IDs to add to the team
+
+        Returns:
+            Dict indicating success or failure of the operation.
+
+        Example:
+            >>> result = await fleet_add_team_users(team_id=1, user_ids=[10, 20])
+            >>> print(result["message"])
+        """
+        try:
+            async with client:
+                json_data = {"users": [{"id": uid} for uid in user_ids]}
+                response = await client.patch(
+                    f"/teams/{team_id}/users", json_data=json_data
+                )
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Added {len(user_ids)} users to team {team_id}",
+                    "team_id": team_id,
+                    "user_ids": user_ids,
+                    "users_added": len(user_ids) if response.success else 0,
+                }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to add users to team {team_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to add users to team: {str(e)}",
+                "team_id": team_id,
+                "user_ids": user_ids,
+                "users_added": 0,
+            }
+
+    @mcp.tool()
+    async def fleet_remove_team_user(team_id: int, user_id: int) -> dict[str, Any]:
+        """Remove a specific user from a team.
+
+        Args:
+            team_id: ID of the team
+            user_id: ID of the user to remove
+
+        Returns:
+            Dict indicating success or failure of the operation.
+
+        Example:
+            >>> result = await fleet_remove_team_user(team_id=1, user_id=10)
+            >>> print(result["message"])
+        """
+        try:
+            async with client:
+                json_data = {"users": [{"id": user_id}]}
+                response = await client.delete(
+                    f"/teams/{team_id}/users", json_data=json_data
+                )
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Removed user {user_id} from team {team_id}",
+                    "team_id": team_id,
+                    "user_id": user_id,
+                }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to remove user {user_id} from team {team_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to remove user from team: {str(e)}",
+                "team_id": team_id,
+                "user_id": user_id,
             }

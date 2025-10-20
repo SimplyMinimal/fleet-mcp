@@ -428,6 +428,55 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "data": None,
             }
 
+    @mcp.tool()
+    async def fleet_list_mdm_apple_installers(
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """List all Apple MDM installers.
+
+        Args:
+            team_id: Optional team ID to filter installers
+
+        Returns:
+            Dict containing list of Apple MDM installers.
+
+        Example:
+            >>> result = await fleet_list_mdm_apple_installers()
+            >>> print(result["installers"])
+        """
+        try:
+            async with client:
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+
+                response = await client.get("/mdm/apple/installers", params=params)
+
+                if response.success and response.data:
+                    installers = response.data.get("installers", [])
+                    return {
+                        "success": True,
+                        "installers": installers,
+                        "count": len(installers),
+                        "message": f"Found {len(installers)} Apple MDM installers",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "installers": [],
+                        "count": 0,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to list Apple MDM installers: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list Apple MDM installers: {str(e)}",
+                "installers": [],
+                "count": 0,
+            }
+
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register write MDM management tools with the MCP server.
@@ -807,5 +856,62 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "success": False,
                 "message": f"Failed to delete Setup Assistant: {str(e)}",
                 "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_upload_mdm_apple_installer(
+        installer_filename: str,
+        installer_content: str,
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Upload a new Apple MDM installer package.
+
+        Args:
+            installer_filename: Name of the installer file (e.g., "installer.pkg")
+            installer_content: Content of the installer file (base64 or raw)
+            team_id: Optional team ID to associate with the installer
+
+        Returns:
+            Dict containing the uploaded installer details.
+
+        Example:
+            >>> result = await fleet_upload_mdm_apple_installer(
+            ...     installer_filename="installer.pkg",
+            ...     installer_content="<file content>",
+            ...     team_id=1
+            ... )
+            >>> print(result["installer"])
+        """
+        try:
+            async with client:
+                files = {"installer": (installer_filename, installer_content)}
+                data = {}
+                if team_id is not None:
+                    data["team_id"] = str(team_id)
+
+                response = await client.post_multipart(
+                    "/mdm/apple/installers", files=files, data=data
+                )
+
+                if response.success and response.data:
+                    installer = response.data.get("installer", {})
+                    return {
+                        "success": True,
+                        "installer": installer,
+                        "message": f"Uploaded Apple MDM installer successfully",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "installer": {},
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to upload Apple MDM installer: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to upload Apple MDM installer: {str(e)}",
+                "installer": {},
             }
 
