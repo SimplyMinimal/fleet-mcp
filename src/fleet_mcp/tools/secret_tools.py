@@ -39,14 +39,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """List secret variables in Fleet.
 
         Secret variables are encrypted values that can be used in scripts and profiles.
-        This endpoint returns only the names and IDs, not the actual secret values.
+        This endpoint returns only the names, IDs, and timestamps - NOT the actual secret values.
+
+        Secret variable names must be UPPERCASE with underscores (e.g., "API_KEY", "DB_PASSWORD").
 
         Args:
             page: Page number for pagination (0-based)
             per_page: Number of secrets per page
 
         Returns:
-            Dict containing list of secret variable identifiers.
+            Dict containing list of secret variable identifiers (id, name, updated_at).
         """
         try:
             async with client:
@@ -91,17 +93,32 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Secret variables are encrypted values that can be used in scripts and profiles.
         The value is encrypted server-side using Fleet's private key.
 
+        Fleet requires secret variable names to be UPPERCASE with only letters (A-Z),
+        numbers (0-9), and underscores (_). This tool automatically converts the name
+        to uppercase for convenience.
+
+        You can provide names in any case:
+        - "api_key" → "API_KEY"
+        - "Test2" → "TEST2"
+        - "my_secret" → "MY_SECRET"
+
+        Note: Names must still only contain letters, numbers, and underscores (no spaces
+        or special characters), and be under 255 characters.
+
         Args:
-            name: Name of the secret variable (must be unique)
-            value: Value of the secret (will be encrypted)
+            name: Name of the secret variable (will be converted to uppercase, must be unique)
+            value: Value of the secret (will be encrypted, cannot be empty)
 
         Returns:
-            Dict containing the created secret variable information.
+            Dict containing the created secret variable information with the uppercase name.
         """
         try:
+            # Convert name to uppercase to meet Fleet's naming requirements
+            uppercase_name = name.upper()
+
             async with client:
                 payload = {
-                    "name": name,
+                    "name": uppercase_name,
                     "value": value,
                 }
                 response = await client.post(
@@ -110,7 +127,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 )
                 return {
                     "success": True,
-                    "message": f"Created secret variable '{name}'",
+                    "message": f"Created secret variable '{uppercase_name}'",
                     "data": response,
                 }
         except FleetAPIError as e:
