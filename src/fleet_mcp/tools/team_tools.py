@@ -30,15 +30,37 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
-    async def fleet_list_teams() -> dict[str, Any]:
-        """List all teams in Fleet.
+    async def fleet_list_teams(
+        page: int = 0,
+        per_page: int = 100,
+        order_key: str = "name",
+        order_direction: str = "asc",
+        query: str = "",
+    ) -> dict[str, Any]:
+        """List all teams in Fleet with pagination and sorting.
+
+        Args:
+            page: Page number for pagination (0-based)
+            per_page: Number of teams per page
+            order_key: Field to order by (name, created_at)
+            order_direction: Sort direction (asc, desc)
+            query: Search query to filter teams by name
 
         Returns:
-            Dict containing list of teams.
+            Dict containing list of teams and pagination metadata.
         """
         try:
             async with client:
-                response = await client.get("/teams")
+                params = {
+                    "page": page,
+                    "per_page": min(per_page, 500),
+                    "order_key": order_key,
+                    "order_direction": order_direction,
+                }
+                if query:
+                    params["query"] = query
+
+                response = await client.get("/teams", params=params)
 
                 if response.success and response.data:
                     teams = response.data.get("teams", [])
@@ -47,6 +69,8 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "teams": teams,
                         "count": len(teams),
                         "message": f"Found {len(teams)} teams",
+                        "page": page,
+                        "per_page": per_page,
                     }
                 else:
                     return {

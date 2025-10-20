@@ -527,6 +527,30 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict containing execution ID and host ID.
+
+        Example:
+            >>> # Run a saved script by ID
+            >>> result = await fleet_run_script(host_id=123, script_id=5)
+            >>> print(result)
+            {
+                "success": True,
+                "message": "Script execution started",
+                "execution_id": "abc-123-def",
+                "host_id": 123
+            }
+
+            >>> # Run an ad-hoc script
+            >>> result = await fleet_run_script(
+            ...     host_id=123,
+            ...     script_contents="#!/bin/bash\\necho 'Hello World'"
+            ... )
+            >>> print(result)
+            {
+                "success": True,
+                "message": "Script execution started",
+                "execution_id": "xyz-456-uvw",
+                "host_id": 123
+            }
         """
         try:
             async with client:
@@ -802,8 +826,8 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 files = {"script": (script_name, script_contents)}
                 data = {}
                 if team_id is not None:
-                    # Pass team_id as integer, not string
-                    data["team_id"] = team_id
+                    # Convert team_id to string for multipart form data
+                    data["team_id"] = str(team_id)
 
                 response = await client.post_multipart("/api/v1/fleet/scripts", files=files, data=data)
 

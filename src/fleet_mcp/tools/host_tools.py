@@ -132,19 +132,34 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
-    async def fleet_search_hosts(query: str, limit: int = 50) -> dict[str, Any]:
+    async def fleet_search_hosts(
+        query: str,
+        page: int = 0,
+        per_page: int = 50,
+        order_key: str = "hostname",
+        order_direction: str = "asc",
+    ) -> dict[str, Any]:
         """Search for hosts by hostname, UUID, hardware serial, or IP address.
 
         Args:
             query: Search term (hostname, UUID, serial number, or IP)
-            limit: Maximum number of results to return
+            page: Page number for pagination (0-based)
+            per_page: Number of results per page (max 500)
+            order_key: Field to order by (hostname, computer_name, platform, status)
+            order_direction: Sort direction (asc, desc)
 
         Returns:
-            Dict containing matching hosts.
+            Dict containing matching hosts and pagination metadata.
         """
         try:
             async with client:
-                params = {"query": query, "per_page": min(limit, 500)}
+                params = {
+                    "query": query,
+                    "page": page,
+                    "per_page": min(per_page, 500),
+                    "order_key": order_key,
+                    "order_direction": order_direction,
+                }
 
                 response = await client.get("/hosts", params=params)
 
@@ -155,6 +170,8 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "hosts": hosts,
                         "count": len(hosts),
                         "query": query,
+                        "page": page,
+                        "per_page": per_page,
                         "message": f"Found {len(hosts)} hosts matching '{query}'",
                     }
                 else:
@@ -368,18 +385,30 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
-    async def fleet_list_host_certificates(host_id: int) -> dict[str, Any]:
-        """List certificates for a specific host.
+    async def fleet_list_host_certificates(
+        host_id: int,
+        page: int = 0,
+        per_page: int = 100,
+    ) -> dict[str, Any]:
+        """List certificates for a specific host with pagination.
 
         Args:
             host_id: ID of the host to get certificates for
+            page: Page number for pagination (0-based)
+            per_page: Number of certificates per page
 
         Returns:
-            Dict containing list of certificates for the host.
+            Dict containing list of certificates and pagination metadata.
         """
         try:
             async with client:
-                response = await client.get(f"/hosts/{host_id}/certificates")
+                params = {
+                    "page": page,
+                    "per_page": min(per_page, 500),
+                }
+                response = await client.get(
+                    f"/hosts/{host_id}/certificates", params=params
+                )
 
                 if response.success and response.data:
                     certificates = response.data.get("certificates", [])
@@ -388,6 +417,8 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "certificates": certificates,
                         "count": len(certificates),
                         "host_id": host_id,
+                        "page": page,
+                        "per_page": per_page,
                         "message": f"Found {len(certificates)} certificates for host {host_id}",
                     }
                 else:

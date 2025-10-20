@@ -41,6 +41,25 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict containing list of App Store apps.
+
+        Example:
+            >>> result = await fleet_list_app_store_apps(team_id=1)
+            >>> print(result)
+            {
+                "success": True,
+                "message": "Retrieved 5 App Store apps",
+                "data": {
+                    "app_store_apps": [
+                        {
+                            "id": 1,
+                            "name": "Slack",
+                            "bundle_identifier": "com.tinyspeck.slackmacgap",
+                            "version": "4.35.0",
+                            "platform": "darwin"
+                        }
+                    ]
+                }
+            }
         """
         try:
             async with client:

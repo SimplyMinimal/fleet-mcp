@@ -38,6 +38,26 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict containing the complete Fleet configuration.
+
+        Example:
+            >>> result = await fleet_get_config()
+            >>> print(result)
+            {
+                "success": True,
+                "message": "Retrieved Fleet configuration",
+                "data": {
+                    "org_info": {
+                        "org_name": "Acme Corp",
+                        "org_logo_url": "https://example.com/logo.png"
+                    },
+                    "server_settings": {
+                        "server_url": "https://fleet.example.com",
+                        "live_query_disabled": False
+                    },
+                    "integrations": {...},
+                    "mdm": {...}
+                }
+            }
         """
         try:
             async with client:

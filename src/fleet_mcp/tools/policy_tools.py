@@ -30,18 +30,33 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
-    async def fleet_list_policies(team_id: int | None = None) -> dict[str, Any]:
-        """List all policies in Fleet.
+    async def fleet_list_policies(
+        page: int = 0,
+        per_page: int = 100,
+        order_key: str = "name",
+        order_direction: str = "asc",
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """List all policies in Fleet with pagination and sorting.
 
         Args:
+            page: Page number for pagination (0-based)
+            per_page: Number of policies per page
+            order_key: Field to order by (name, critical, created_at, updated_at)
+            order_direction: Sort direction (asc, desc)
             team_id: Filter policies by team ID
 
         Returns:
-            Dict containing list of policies.
+            Dict containing list of policies and pagination metadata.
         """
         try:
             async with client:
-                params = {}
+                params = {
+                    "page": page,
+                    "per_page": min(per_page, 500),
+                    "order_key": order_key,
+                    "order_direction": order_direction,
+                }
                 if team_id is not None:
                     params["team_id"] = team_id
 
@@ -54,6 +69,8 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "policies": policies,
                         "count": len(policies),
                         "message": f"Found {len(policies)} policies",
+                        "page": page,
+                        "per_page": per_page,
                     }
                 else:
                     return {

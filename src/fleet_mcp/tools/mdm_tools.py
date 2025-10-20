@@ -302,6 +302,20 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict containing bootstrap package metadata.
+
+        Example:
+            >>> result = await fleet_get_bootstrap_metadata(team_id=0)
+            >>> print(result)
+            {
+                "success": True,
+                "message": "Retrieved bootstrap package metadata for team 0",
+                "data": {
+                    "name": "bootstrap.pkg",
+                    "sha256": "abc123...",
+                    "created_at": "2025-10-20T10:00:00Z",
+                    "team_id": 0
+                }
+            }
         """
         try:
             async with client:
@@ -588,6 +602,21 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict indicating success or failure of the upload.
+
+        Example:
+            >>> import base64
+            >>> with open("bootstrap.pkg", "rb") as f:
+            ...     pkg_data = base64.b64encode(f.read()).decode()
+            >>> result = await fleet_upload_bootstrap_package(
+            ...     package_content=pkg_data,
+            ...     team_id=0
+            ... )
+            >>> print(result)
+            {
+                "success": True,
+                "message": "Bootstrap package uploaded successfully for team 0",
+                "data": None
+            }
         """
         try:
             async with client:
@@ -678,6 +707,33 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict containing the created/updated Setup Assistant configuration.
+
+        Example:
+            >>> import json
+            >>> profile = {
+            ...     "skip_setup_items": {
+            ...         "Location": True,
+            ...         "Privacy": True,
+            ...         "Restore": True,
+            ...         "Appearance": False,
+            ...         "Biometric": False
+            ...     }
+            ... }
+            >>> result = await fleet_create_setup_assistant(
+            ...     name="Corporate Setup",
+            ...     enrollment_profile=json.dumps(profile),
+            ...     team_id=None
+            ... )
+            >>> print(result)
+            {
+                "success": True,
+                "message": "Setup Assistant created/updated successfully",
+                "data": {
+                    "name": "Corporate Setup",
+                    "enrollment_profile": {...},
+                    "team_id": None
+                }
+            }
         """
         try:
             async with client:
