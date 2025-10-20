@@ -2,8 +2,11 @@
 
 from . import (
     carve_tools,
+    config_tools,
     host_tools,
+    invite_tools,
     label_tools,
+    mdm_tools,
     pack_tools,
     policy_tools,
     query_tools,
@@ -17,8 +20,11 @@ from . import (
 
 __all__ = [
     "carve_tools",
+    "config_tools",
     "host_tools",
+    "invite_tools",
     "label_tools",
+    "mdm_tools",
     "pack_tools",
     "policy_tools",
     "query_tools",

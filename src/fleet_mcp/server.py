@@ -9,8 +9,11 @@ from .client import FleetClient
 from .config import FleetConfig, get_default_config_file, load_config
 from .tools import (
     carve_tools,
+    config_tools,
     host_tools,
+    invite_tools,
     label_tools,
+    mdm_tools,
     pack_tools,
     policy_tools,
     query_tools,
@@ -130,6 +133,9 @@ class FleetMCPServer:
             self.mcp, self.client
         )  # Table tools are all read-only
         team_tools.register_read_tools(self.mcp, self.client)
+        config_tools.register_read_tools(self.mcp, self.client)
+        invite_tools.register_read_tools(self.mcp, self.client)
+        mdm_tools.register_read_tools(self.mcp, self.client)
 
         # Register SELECT-only query tools if in readonly mode with allow_select_queries
         if self.config.readonly and self.config.allow_select_queries:
@@ -146,6 +152,9 @@ class FleetMCPServer:
             software_tools.register_write_tools(self.mcp, self.client)
             secret_tools.register_write_tools(self.mcp, self.client)
             team_tools.register_write_tools(self.mcp, self.client)
+            config_tools.register_write_tools(self.mcp, self.client)
+            invite_tools.register_write_tools(self.mcp, self.client)
+            mdm_tools.register_write_tools(self.mcp, self.client)
 
         # Register server health check tool (always available)
         self._register_health_check()

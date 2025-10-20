@@ -458,6 +458,105 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "data": None,
             }
 
+    @mcp.tool()
+    async def fleet_list_software_titles(
+        page: int = 0,
+        per_page: int = 100,
+        order_key: str = "name",
+        order_direction: str = "asc",
+        query: str = "",
+        team_id: int | None = None,
+        available_for_install: bool | None = None,
+    ) -> dict[str, Any]:
+        """List software titles in Fleet.
+
+        Software titles represent unique software products that may have
+        multiple versions installed across hosts. This is different from
+        fleet_list_software which lists individual software versions.
+
+        Args:
+            page: Page number for pagination (0-based)
+            per_page: Number of titles per page
+            order_key: Field to order by (name, hosts_count)
+            order_direction: Sort direction (asc, desc)
+            query: Search query to filter titles by name
+            team_id: Filter titles by team ID
+            available_for_install: Filter to titles available for installation
+
+        Returns:
+            Dict containing list of software titles with aggregated information.
+        """
+        try:
+            async with client:
+                params = {
+                    "page": page,
+                    "per_page": per_page,
+                    "order_key": order_key,
+                    "order_direction": order_direction,
+                }
+                if query:
+                    params["query"] = query
+                if team_id is not None:
+                    params["team_id"] = team_id
+                if available_for_install is not None:
+                    params["available_for_install"] = str(available_for_install).lower()
+
+                response = await client.get(
+                    "/api/latest/fleet/software/titles", params=params
+                )
+                data = response.data or {}
+                titles = data.get("software_titles", [])
+                return {
+                    "success": True,
+                    "message": f"Retrieved {len(titles)} software titles",
+                    "data": data,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to list software titles: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list software titles: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_get_software_title(
+        title_id: int,
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Get detailed information about a specific software title.
+
+        Args:
+            title_id: ID of the software title
+            team_id: Optional team ID to scope the query
+
+        Returns:
+            Dict containing detailed software title information including
+            versions, hosts, and installation options.
+        """
+        try:
+            async with client:
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+
+                response = await client.get(
+                    f"/api/latest/fleet/software/titles/{title_id}",
+                    params=params if params else None,
+                )
+                return {
+                    "success": True,
+                    "message": f"Retrieved software title {title_id}",
+                    "data": response,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to get software title {title_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get software title: {str(e)}",
+                "data": None,
+            }
+
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register write software management tools with the MCP server.
