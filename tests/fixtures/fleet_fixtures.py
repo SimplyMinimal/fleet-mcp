@@ -50,24 +50,29 @@ def live_fleet_config():
     Default to readonly mode for safety in tests.
 
     Reads from environment variables or .env file via pydantic-settings.
+    Uses dotenv_values() to avoid polluting the global environment.
     """
     import os
 
-    from dotenv import load_dotenv
+    from dotenv import dotenv_values
 
-    # Load .env file explicitly for tests
-    load_dotenv()
+    # Load .env file values without setting environment variables
+    # This prevents pollution of the global environment that could affect other tests
+    env_values = dotenv_values()
+
+    # Get values from environment first, then fall back to .env file values
+    def get_env(key: str, default: str) -> str:
+        return os.getenv(key) or env_values.get(key, default)
 
     # Now create config from environment variables
     return FleetConfig(
-        server_url=os.getenv("FLEET_SERVER_URL", "http://192.168.68.125:1337"),
-        api_token=os.getenv(
+        server_url=get_env("FLEET_SERVER_URL", "http://192.168.68.125:1337"),
+        api_token=get_env(
             "FLEET_API_TOKEN",
             "+nHwmPaf7wSt9sg8qvNX0/LDL26TdM6wxXYD/4W9tfzmNeq+5GWBzmR15Oq6GpMgGzkLpPcH3vq4i9pXi/+lLw==",
         ),
-        readonly=os.getenv("FLEET_READONLY", "true").lower() in ("true", "1", "yes"),
-        verify_ssl=os.getenv("FLEET_VERIFY_SSL", "true").lower()
-        in ("true", "1", "yes"),
+        readonly=get_env("FLEET_READONLY", "true").lower() in ("true", "1", "yes"),
+        verify_ssl=get_env("FLEET_VERIFY_SSL", "true").lower() in ("true", "1", "yes"),
     )
 
 
