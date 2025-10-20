@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import yaml
 
 from ..client import FleetClient
 
@@ -17,10 +18,17 @@ FLEET_SCHEMA_URL = (
     "https://raw.githubusercontent.com/fleetdm/fleet/main/schema/osquery_fleet_schema.json"
 )
 
+# Fleet schema overrides base URL
+FLEET_SCHEMA_OVERRIDES_BASE_URL = (
+    "https://raw.githubusercontent.com/fleetdm/fleet/main/schema/tables"
+)
+
 # Cache directory and file
 CACHE_DIR = Path.home() / ".fleet-mcp" / "cache"
 SCHEMA_CACHE_FILE = CACHE_DIR / "osquery_fleet_schema.json"
+SCHEMA_OVERRIDES_CACHE_FILE = CACHE_DIR / "osquery_schema_overrides.json"
 SCHEMA_CACHE_TTL = 86400  # 24 hours in seconds
+SCHEMA_OVERRIDES_CACHE_TTL = 86400  # 24 hours in seconds
 
 
 class TableSchemaCache:
@@ -50,13 +58,18 @@ class TableSchemaCache:
         self.cache_ttl = 3600  # 1 hour for host tables
         self.schema_cache_ttl = SCHEMA_CACHE_TTL  # 24 hours for Fleet schemas
 
+        # Schema overrides from Fleet's YAML files
+        self.schema_overrides: dict[str, dict[str, Any]] = {}
+        self.overrides_loaded = False
+        self.overrides_source: str | None = None  # "cache", "download", or None
+
         # Track loading status and errors
         self.schema_source: str | None = None  # "cache", "download", "bundled", or None
         self.loading_errors: list[str] = []  # List of error messages encountered
         self.loading_warnings: list[str] = []  # List of warning messages encountered
 
     async def initialize(self, force_refresh: bool = False) -> None:
-        """Initialize the cache by loading Fleet schemas.
+        """Initialize the cache by loading Fleet schemas and overrides.
 
         Args:
             force_refresh: If True, force download of fresh schema even if cache is valid
@@ -64,6 +77,11 @@ class TableSchemaCache:
         if not self.fleet_schemas_loaded or force_refresh:
             await self._load_fleet_schemas(force_refresh=force_refresh)
             self.fleet_schemas_loaded = True
+
+        # Load schema overrides (non-blocking - failures don't prevent schema loading)
+        if not self.overrides_loaded or force_refresh:
+            await self._load_schema_overrides(force_refresh=force_refresh)
+            self.overrides_loaded = True
 
     async def _load_fleet_schemas(self, force_refresh: bool = False) -> None:
         """Load table schemas from Fleet's official JSON schema.
@@ -310,6 +328,147 @@ class TableSchemaCache:
 
         return schemas
 
+    async def _load_schema_overrides(self, force_refresh: bool = False) -> None:
+        """Load table schema overrides from Fleet's YAML files.
+
+        This method implements a multi-tier loading strategy:
+        1. Check local cache file (if valid and not force_refresh)
+        2. Download fresh overrides from GitHub
+        3. Fall back to cached version if download fails
+        4. Continue gracefully if no overrides available
+
+        Args:
+            force_refresh: If True, skip cache and force download
+        """
+        logger.info("Loading Fleet table schema overrides...")
+
+        # Ensure cache directory exists
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Try to load from cache first (unless force_refresh)
+        if not force_refresh and SCHEMA_OVERRIDES_CACHE_FILE.exists():
+            cache_age = time.time() - SCHEMA_OVERRIDES_CACHE_FILE.stat().st_mtime
+            if cache_age < SCHEMA_OVERRIDES_CACHE_TTL:
+                try:
+                    overrides = await self._load_cached_overrides()
+                    if overrides:
+                        self.schema_overrides = overrides
+                        self.overrides_source = "cache"
+                        logger.info(
+                            f"Loaded {len(overrides)} table overrides from cache "
+                            f"(age: {cache_age/3600:.1f} hours)"
+                        )
+                        return
+                except Exception as e:
+                    logger.warning(f"Failed to load cached overrides: {e}")
+
+        # Try to download fresh overrides
+        try:
+            overrides = await self._download_schema_overrides()
+            if overrides:
+                self.schema_overrides = overrides
+                self.overrides_source = "download"
+                # Save to cache
+                await self._save_overrides_cache(overrides)
+                logger.info(
+                    f"Downloaded and cached {len(overrides)} table overrides from Fleet"
+                )
+                return
+        except Exception as e:
+            logger.warning(f"Failed to download schema overrides: {e}")
+
+        # Fall back to cached version (even if expired)
+        if SCHEMA_OVERRIDES_CACHE_FILE.exists():
+            try:
+                overrides = await self._load_cached_overrides()
+                if overrides:
+                    self.schema_overrides = overrides
+                    self.overrides_source = "cache_stale"
+                    logger.warning(
+                        f"Using stale cached overrides ({len(overrides)} tables) - "
+                        "download failed"
+                    )
+                    return
+            except Exception as e:
+                logger.warning(f"Failed to load stale override cache: {e}")
+
+        # If we get here, no overrides are available - this is not fatal
+        logger.info("No schema overrides available - continuing with base schemas")
+        self.schema_overrides = {}
+        self.overrides_source = "none"
+
+    async def _download_schema_overrides(self) -> dict[str, dict[str, Any]]:
+        """Download schema override YAML files from Fleet's GitHub repository.
+
+        Returns:
+            Dictionary mapping table names to override dictionaries
+        """
+        logger.debug(f"Downloading schema overrides from {FLEET_SCHEMA_OVERRIDES_BASE_URL}")
+
+        overrides = {}
+
+        # Get list of tables we have schemas for
+        table_names = list(self.fleet_schemas.keys())
+        logger.debug(f"Attempting to download overrides for {len(table_names)} tables")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for table_name in table_names:
+                try:
+                    # Construct URL for the YAML file
+                    yaml_url = f"{FLEET_SCHEMA_OVERRIDES_BASE_URL}/{table_name}.yml"
+
+                    response = await client.get(yaml_url)
+
+                    # 404 is expected for tables without overrides
+                    if response.status_code == 404:
+                        continue
+
+                    response.raise_for_status()
+
+                    # Parse YAML
+                    override_data = yaml.safe_load(response.text)
+                    if override_data:
+                        overrides[table_name] = override_data
+                        logger.debug(f"Downloaded override for table: {table_name}")
+
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code != 404:
+                        logger.debug(
+                            f"Failed to download override for {table_name}: {e}"
+                        )
+                except Exception as e:
+                    logger.debug(f"Error processing override for {table_name}: {e}")
+
+        logger.info(f"Downloaded {len(overrides)} table overrides")
+        return overrides
+
+    async def _load_cached_overrides(self) -> dict[str, dict[str, Any]]:
+        """Load schema overrides from local cache file.
+
+        Returns:
+            Dictionary mapping table names to override dictionaries
+        """
+        logger.debug(f"Loading overrides from cache: {SCHEMA_OVERRIDES_CACHE_FILE}")
+
+        with open(SCHEMA_OVERRIDES_CACHE_FILE, "r") as f:
+            overrides_json: dict[str, dict[str, Any]] = json.load(f)
+
+        return overrides_json
+
+    async def _save_overrides_cache(self, overrides: dict[str, dict[str, Any]]) -> None:
+        """Save schema overrides to local cache file.
+
+        Args:
+            overrides: Dictionary of table overrides to cache
+        """
+        try:
+            with open(SCHEMA_OVERRIDES_CACHE_FILE, "w") as f:
+                json.dump(overrides, f, indent=2)
+
+            logger.debug(f"Saved overrides cache to {SCHEMA_OVERRIDES_CACHE_FILE}")
+        except Exception as e:
+            logger.warning(f"Failed to save overrides cache: {e}")
+
     async def _load_bundled_schemas(self) -> dict[str, dict[str, Any]]:
         """Load bundled fallback schemas.
 
@@ -478,6 +637,9 @@ class TableSchemaCache:
                     if col_name in enriched["column_details"]:
                         enriched["column_details"][col_name].update(col_info)
 
+                # Merge schema overrides
+                enriched = self._merge_overrides_with_schema(name, enriched)
+
                 enriched_tables.append(enriched)
             else:
                 # Custom/unknown table
@@ -496,6 +658,37 @@ class TableSchemaCache:
 
         return enriched_tables
 
+    def _merge_overrides_with_schema(
+        self, table_name: str, schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Merge schema override data with base schema.
+
+        Args:
+            table_name: Name of the table
+            schema: Base schema dictionary
+
+        Returns:
+            Merged schema with override data
+        """
+        merged = dict(schema)
+
+        if table_name in self.schema_overrides:
+            override = self.schema_overrides[table_name]
+
+            # Add override notes prominently
+            if "notes" in override:
+                merged["override_notes"] = override["notes"]
+
+            # Add override examples
+            if "examples" in override:
+                merged["override_examples"] = override["examples"]
+
+            # Mark that this table has overrides
+            merged["has_overrides"] = True
+            merged["override_source"] = "fleet_yaml"
+
+        return merged
+
     def _get_fleet_schemas_by_platform(self, platform: str) -> list[dict[str, Any]]:
         """Get Fleet schemas filtered by platform (fallback method).
 
@@ -509,10 +702,11 @@ class TableSchemaCache:
 
         for name, schema in self.fleet_schemas.items():
             if platform in schema.get("platforms", []):
+                merged_schema = self._merge_overrides_with_schema(name, schema)
                 tables.append(
                     {
                         "name": name,
-                        **schema,
+                        **merged_schema,
                         "is_custom": False,
                         "metadata_source": "fleet_repository_only",
                     }
@@ -584,6 +778,15 @@ class TableSchemaCache:
                 "Check network connectivity and cache file."
             )
 
+        # Get override cache info
+        overrides_cache_exists = SCHEMA_OVERRIDES_CACHE_FILE.exists()
+        overrides_cache_age = None
+        overrides_cache_size = None
+
+        if overrides_cache_exists:
+            overrides_cache_age = time.time() - SCHEMA_OVERRIDES_CACHE_FILE.stat().st_mtime
+            overrides_cache_size = SCHEMA_OVERRIDES_CACHE_FILE.stat().st_size
+
         return {
             "schema_cache_file": str(SCHEMA_CACHE_FILE),
             "cache_exists": cache_exists,
@@ -600,6 +803,14 @@ class TableSchemaCache:
             "schema_source": self.schema_source,
             "loading_errors": list(self.loading_errors),  # Copy the list
             "loading_warnings": warnings,
+            # Override cache info
+            "overrides_cache_file": str(SCHEMA_OVERRIDES_CACHE_FILE),
+            "overrides_cache_exists": overrides_cache_exists,
+            "overrides_cache_age_seconds": overrides_cache_age,
+            "overrides_cache_age_hours": overrides_cache_age / 3600 if overrides_cache_age else None,
+            "overrides_cache_size_bytes": overrides_cache_size,
+            "loaded_overrides_count": len(self.schema_overrides),
+            "overrides_source": self.overrides_source,
         }
 
 

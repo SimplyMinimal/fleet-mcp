@@ -252,12 +252,19 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     ) -> dict[str, Any]:
         """Get detailed schema information for a specific osquery table.
 
+        This tool retrieves comprehensive schema information including:
+        - Column names, types, and descriptions
+        - Platform availability
+        - Usage examples
+        - Special requirements and notes from Fleet's schema overrides
+
         Args:
             table_name: Name of the osquery table to get schema for
             host_id: Optional host ID to get live schema from (recommended)
 
         Returns:
-            Dict containing detailed table schema, columns, types, and usage examples.
+            Dict containing detailed table schema, columns, types, usage examples,
+            and any special requirements or notes from Fleet's schema overrides.
         """
         try:
             # Get table cache
@@ -282,7 +289,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 # Use all Fleet schemas
                 tables = []
                 for name, schema in cache.fleet_schemas.items():
-                    tables.append({"name": name, **schema, "is_custom": False})
+                    # Merge with overrides
+                    merged_schema = cache._merge_overrides_with_schema(name, schema)
+                    tables.append({"name": name, **merged_schema, "is_custom": False})
 
             # Find the specific table
             table_info = None
@@ -298,11 +307,22 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "table": None,
                 }
 
-            return {
+            # Build response with prominent override information
+            response = {
                 "success": True,
                 "table": table_info,
                 "message": f"Retrieved schema for table '{table_name}'",
             }
+
+            # Add prominent section for override notes if present
+            if table_info.get("has_overrides"):
+                response["usage_requirements"] = {
+                    "has_special_requirements": True,
+                    "notes": table_info.get("override_notes"),
+                    "examples": table_info.get("override_examples"),
+                }
+
+            return response
 
         except Exception as e:
             logger.error(f"Failed to get table schema for {table_name}: {e}")
