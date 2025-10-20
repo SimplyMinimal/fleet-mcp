@@ -8,12 +8,15 @@ from mcp.server.fastmcp import FastMCP
 from .client import FleetClient
 from .config import FleetConfig, get_default_config_file, load_config
 from .tools import (
+    carve_tools,
     host_tools,
     label_tools,
+    pack_tools,
     policy_tools,
     query_tools,
     query_tools_readonly,
     script_tools,
+    secret_tools,
     software_tools,
     table_tools,
     team_tools,
@@ -114,12 +117,15 @@ class FleetMCPServer:
         # Always register read-only tools
         host_tools.register_read_tools(self.mcp, self.client)
         label_tools.register_read_tools(self.mcp, self.client)
+        pack_tools.register_read_tools(self.mcp, self.client)
+        carve_tools.register_tools(
+            self.mcp, self.client
+        )  # Carve tools are all read-only
         query_tools.register_read_tools(self.mcp, self.client)
         policy_tools.register_read_tools(self.mcp, self.client)
         script_tools.register_read_tools(self.mcp, self.client)
-        software_tools.register_tools(
-            self.mcp, self.client
-        )  # Software tools are all read-only
+        software_tools.register_read_tools(self.mcp, self.client)
+        secret_tools.register_read_tools(self.mcp, self.client)
         table_tools.register_tools(
             self.mcp, self.client
         )  # Table tools are all read-only
@@ -133,9 +139,12 @@ class FleetMCPServer:
         if not self.config.readonly:
             host_tools.register_write_tools(self.mcp, self.client)
             label_tools.register_write_tools(self.mcp, self.client)
+            pack_tools.register_write_tools(self.mcp, self.client)
             query_tools.register_write_tools(self.mcp, self.client)
             policy_tools.register_write_tools(self.mcp, self.client)
             script_tools.register_write_tools(self.mcp, self.client)
+            software_tools.register_write_tools(self.mcp, self.client)
+            secret_tools.register_write_tools(self.mcp, self.client)
             team_tools.register_write_tools(self.mcp, self.client)
 
         # Register server health check tool (always available)

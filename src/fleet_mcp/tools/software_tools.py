@@ -17,6 +17,17 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
         mcp: FastMCP server instance
         client: Fleet API client
     """
+    register_read_tools(mcp, client)
+    register_write_tools(mcp, client)
+
+
+def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register read-only software management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
 
     @mcp.tool()
     async def fleet_list_software(
@@ -417,4 +428,79 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "hostname": hostname,
                 "software_name": software_name,
                 "software": [],
+            }
+
+    @mcp.tool()
+    async def fleet_get_software_install_result(install_uuid: str) -> dict[str, Any]:
+        """Get the result of a software installation request.
+
+        Args:
+            install_uuid: UUID of the software installation request
+
+        Returns:
+            Dict containing the installation result including status and output.
+        """
+        try:
+            async with client:
+                response = await client.get(
+                    f"/api/latest/fleet/software/install/{install_uuid}/results"
+                )
+                return {
+                    "success": True,
+                    "message": f"Retrieved install result for {install_uuid}",
+                    "data": response,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to get software install result: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get install result: {str(e)}",
+                "data": None,
+            }
+
+
+def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register write software management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+
+    @mcp.tool()
+    async def fleet_install_software(
+        host_id: int,
+        software_title_id: int,
+    ) -> dict[str, Any]:
+        """Install software on a specific host.
+
+        This triggers a software installation (VPP app or software package)
+        on the specified host. The installation is asynchronous - use
+        fleet_get_software_install_result to check the status.
+
+        Args:
+            host_id: ID of the host to install software on
+            software_title_id: ID of the software title to install
+
+        Returns:
+            Dict containing the installation request details including install_uuid.
+        """
+        try:
+            async with client:
+                response = await client.post(
+                    f"/api/latest/fleet/hosts/{host_id}/software/{software_title_id}/install"
+                )
+                return {
+                    "success": True,
+                    "message": f"Software installation initiated on host {host_id}",
+                    "data": response,
+                }
+        except FleetAPIError as e:
+            logger.error(
+                f"Failed to install software {software_title_id} on host {host_id}: {e}"
+            )
+            return {
+                "success": False,
+                "message": f"Failed to install software: {str(e)}",
+                "data": None,
             }

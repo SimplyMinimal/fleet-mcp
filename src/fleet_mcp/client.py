@@ -277,9 +277,11 @@ class FleetClient:
         """Make PATCH request."""
         return await self._make_request("PATCH", endpoint, json_data=json_data)
 
-    async def delete(self, endpoint: str) -> FleetResponse:
+    async def delete(
+        self, endpoint: str, json_data: dict[str, Any] | None = None
+    ) -> FleetResponse:
         """Make DELETE request."""
-        return await self._make_request("DELETE", endpoint)
+        return await self._make_request("DELETE", endpoint, json_data=json_data)
 
     async def post_multipart(
         self,

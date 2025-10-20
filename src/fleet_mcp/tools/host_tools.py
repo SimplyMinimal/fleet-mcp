@@ -751,3 +751,79 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to unenroll host from MDM: {str(e)}",
                 "host_id": host_id,
             }
+
+    @mcp.tool()
+    async def fleet_add_labels_to_host(
+        host_id: int,
+        label_names: list[str],
+    ) -> dict[str, Any]:
+        """Add labels to a host.
+
+        This adds manual labels to a host. Only works with manual labels
+        (not dynamic/query-based labels).
+
+        Args:
+            host_id: ID of the host to add labels to
+            label_names: List of label names to add to the host
+
+        Returns:
+            Dict containing the operation result.
+        """
+        try:
+            async with client:
+                payload = {"labels": label_names}
+                await client.post(
+                    f"/api/latest/fleet/hosts/{host_id}/labels",
+                    json_data=payload,
+                )
+                return {
+                    "success": True,
+                    "message": f"Added {len(label_names)} labels to host {host_id}",
+                    "host_id": host_id,
+                    "labels_added": label_names,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to add labels to host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to add labels to host: {str(e)}",
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_remove_labels_from_host(
+        host_id: int,
+        label_names: list[str],
+    ) -> dict[str, Any]:
+        """Remove labels from a host.
+
+        This removes manual labels from a host. Only works with manual labels
+        (not dynamic/query-based labels).
+
+        Args:
+            host_id: ID of the host to remove labels from
+            label_names: List of label names to remove from the host
+
+        Returns:
+            Dict containing the operation result.
+        """
+        try:
+            async with client:
+                payload = {"labels": label_names}
+                await client.delete(
+                    f"/api/latest/fleet/hosts/{host_id}/labels",
+                    json_data=payload,
+                )
+                return {
+                    "success": True,
+                    "message": f"Removed {len(label_names)} labels from host {host_id}",
+                    "host_id": host_id,
+                    "labels_removed": label_names,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to remove labels from host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to remove labels from host: {str(e)}",
+                "host_id": host_id,
+            }
