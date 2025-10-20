@@ -298,6 +298,11 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict containing CVE details, affected software, and OS versions.
+
+        Note:
+            If the CVE is known to Fleet but doesn't affect any hosts, the API
+            returns HTTP 204 (No Content) and this tool will return success=True
+            with empty software/os_versions lists.
         """
         try:
             async with client:
@@ -309,10 +314,25 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     f"/api/latest/fleet/vulnerabilities/{cve}",
                     params=params if params else None,
                 )
-                data = response.data or {}
-                vulnerability = data.get("vulnerability", {})
-                software = data.get("software", [])
-                os_versions = data.get("os_versions", [])
+
+                # Handle empty response (HTTP 204 - CVE known but no affected hosts)
+                if response.data is None or not response.data:
+                    return {
+                        "success": True,
+                        "message": f"CVE {cve} is known to Fleet but does not affect any hosts",
+                        "data": {
+                            "vulnerability": None,
+                            "software": [],
+                            "os_versions": [],
+                            "affected_software_count": 0,
+                            "affected_os_count": 0,
+                        },
+                    }
+
+                data = response.data
+                vulnerability = data.get("vulnerability")
+                software = data.get("software") or []
+                os_versions = data.get("os_versions") or []
 
                 return {
                     "success": True,
@@ -327,9 +347,17 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 }
         except FleetAPIError as e:
             logger.error(f"Failed to get CVE {cve}: {e}")
+            # Check if it's a 404 (CVE not found)
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower():
+                return {
+                    "success": False,
+                    "message": f"CVE not found: {cve}",
+                    "data": None,
+                }
             return {
                 "success": False,
-                "message": f"Failed to get CVE: {str(e)}",
+                "message": f"Failed to get CVE: {error_msg}",
                 "data": None,
             }
 
