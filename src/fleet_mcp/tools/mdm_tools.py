@@ -287,6 +287,133 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "data": None,
             }
 
+    @mcp.tool()
+    async def fleet_get_bootstrap_metadata(
+        team_id: int,
+    ) -> dict[str, Any]:
+        """Get metadata about a bootstrap package for a team.
+
+        Returns information about the bootstrap package configured for a team,
+        including name, SHA256 hash, and upload timestamp. Does not return the
+        actual package bytes.
+
+        Args:
+            team_id: Team ID to get bootstrap package metadata for (0 for no team)
+
+        Returns:
+            Dict containing bootstrap package metadata.
+        """
+        try:
+            async with client:
+                response = await client.get(
+                    f"/api/latest/fleet/bootstrap/{team_id}/metadata"
+                )
+                return {
+                    "success": True,
+                    "message": f"Retrieved bootstrap package metadata for team {team_id}",
+                    "data": response.data,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to get bootstrap metadata for team {team_id}: {e}")
+            # Check if it's a 404 (no bootstrap package)
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower():
+                return {
+                    "success": False,
+                    "message": f"No bootstrap package found for team {team_id}",
+                    "data": None,
+                }
+            return {
+                "success": False,
+                "message": f"Failed to get bootstrap metadata: {error_msg}",
+                "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_get_bootstrap_summary(
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Get aggregated summary about bootstrap package deployment.
+
+        Returns statistics about bootstrap package deployment status across
+        hosts, including counts of installed, pending, and failed installations.
+
+        Args:
+            team_id: Optional team ID to scope the summary (None for all teams)
+
+        Returns:
+            Dict containing bootstrap package deployment summary.
+        """
+        try:
+            async with client:
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+
+                response = await client.get(
+                    "/api/latest/fleet/bootstrap/summary",
+                    params=params if params else None,
+                )
+                return {
+                    "success": True,
+                    "message": "Retrieved bootstrap package summary",
+                    "data": response.data,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to get bootstrap summary: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get bootstrap summary: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_get_setup_assistant(
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Get the MDM Apple Setup Assistant configuration.
+
+        Returns the Setup Assistant profile configured for automatic enrollment
+        (DEP/ADE). The Setup Assistant customizes the out-of-box experience for
+        devices enrolled via Apple Business Manager.
+
+        Args:
+            team_id: Optional team ID (None for no team/global)
+
+        Returns:
+            Dict containing Setup Assistant configuration.
+        """
+        try:
+            async with client:
+                params = {}
+                if team_id is not None:
+                    params["team_id"] = team_id
+
+                response = await client.get(
+                    "/api/latest/fleet/enrollment_profiles/automatic",
+                    params=params if params else None,
+                )
+                return {
+                    "success": True,
+                    "message": "Retrieved Setup Assistant configuration",
+                    "data": response.data,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to get Setup Assistant: {e}")
+            # Check if it's a 404 (no setup assistant)
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower():
+                return {
+                    "success": False,
+                    "message": "No Setup Assistant configured",
+                    "data": None,
+                }
+            return {
+                "success": False,
+                "message": f"Failed to get Setup Assistant: {error_msg}",
+                "data": None,
+            }
+
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register write MDM management tools with the MCP server.
@@ -439,4 +566,190 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     #             "message": f"Failed to wipe device: {str(e)}",
     #             "data": None,
     #         }
+
+    @mcp.tool()
+    async def fleet_upload_bootstrap_package(
+        package_content: str,
+        team_id: int,
+    ) -> dict[str, Any]:
+        """Upload a bootstrap package for MDM enrollment.
+
+        Uploads a bootstrap package (.pkg file) that will be installed on
+        devices during MDM enrollment. The package is deployed to devices
+        enrolled via Apple Business Manager (DEP/ADE).
+
+        Note: The package_content should be base64-encoded package data.
+        Fleet expects multipart/form-data upload, but for MCP we accept
+        base64-encoded content.
+
+        Args:
+            package_content: Base64-encoded bootstrap package (.pkg) content
+            team_id: Team ID to assign the package to (0 for no team)
+
+        Returns:
+            Dict indicating success or failure of the upload.
+        """
+        try:
+            async with client:
+                # Note: Fleet API expects multipart/form-data with a file upload.
+                # For MCP, we'll need to send the base64 content as a file.
+                import base64
+
+                # Decode base64 content
+                try:
+                    package_bytes = base64.b64decode(package_content)
+                except Exception as decode_err:
+                    return {
+                        "success": False,
+                        "message": f"Invalid base64 content: {str(decode_err)}",
+                        "data": None,
+                    }
+
+                # Fleet API expects multipart/form-data upload
+                # Convert bytes to string for post_multipart
+                files = {"package": ("bootstrap.pkg", package_content)}
+                data = {"team_id": str(team_id)}
+
+                response = await client.post_multipart(
+                    "/api/latest/fleet/bootstrap",
+                    files=files,
+                    data=data,
+                )
+                return {
+                    "success": True,
+                    "message": f"Bootstrap package uploaded successfully for team {team_id}",
+                    "data": response.data if hasattr(response, "data") else None,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to upload bootstrap package: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to upload bootstrap package: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_delete_bootstrap_package(
+        team_id: int,
+    ) -> dict[str, Any]:
+        """Delete a bootstrap package for a team.
+
+        Removes the bootstrap package configured for a team. This will prevent
+        the package from being installed on newly enrolled devices.
+
+        Args:
+            team_id: Team ID to delete the bootstrap package from (0 for no team)
+
+        Returns:
+            Dict indicating success or failure of the deletion.
+        """
+        try:
+            async with client:
+                await client.delete(f"/api/latest/fleet/bootstrap/{team_id}")
+                return {
+                    "success": True,
+                    "message": f"Bootstrap package deleted successfully for team {team_id}",
+                    "data": None,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to delete bootstrap package for team {team_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to delete bootstrap package: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_create_setup_assistant(
+        name: str,
+        enrollment_profile: str,
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Create or update an MDM Apple Setup Assistant.
+
+        Creates or updates the Setup Assistant profile for automatic enrollment
+        (DEP/ADE). The Setup Assistant customizes the out-of-box experience for
+        devices enrolled via Apple Business Manager.
+
+        Args:
+            name: Name for the Setup Assistant configuration
+            enrollment_profile: JSON string containing the Setup Assistant profile
+            team_id: Optional team ID (None for no team/global)
+
+        Returns:
+            Dict containing the created/updated Setup Assistant configuration.
+        """
+        try:
+            async with client:
+                import json
+
+                # Parse enrollment_profile if it's a JSON string
+                try:
+                    profile_data = json.loads(enrollment_profile)
+                except json.JSONDecodeError:
+                    return {
+                        "success": False,
+                        "message": "Invalid JSON in enrollment_profile parameter",
+                        "data": None,
+                    }
+
+                payload: dict[str, Any] = {
+                    "name": name,
+                    "enrollment_profile": profile_data,
+                }
+                if team_id is not None:
+                    payload["team_id"] = team_id
+
+                response = await client.post(
+                    "/api/latest/fleet/enrollment_profiles/automatic",
+                    json_data=payload,
+                )
+                return {
+                    "success": True,
+                    "message": "Setup Assistant created/updated successfully",
+                    "data": response.data,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to create Setup Assistant: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to create Setup Assistant: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_delete_setup_assistant(
+        team_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Delete the MDM Apple Setup Assistant.
+
+        Removes the Setup Assistant profile for automatic enrollment. This will
+        revert to the default Apple setup experience for newly enrolled devices.
+
+        Args:
+            team_id: Optional team ID (None for no team/global)
+
+        Returns:
+            Dict indicating success or failure of the deletion.
+        """
+        try:
+            async with client:
+                # Build endpoint with query parameter if team_id is provided
+                endpoint = "/api/latest/fleet/enrollment_profiles/automatic"
+                if team_id is not None:
+                    endpoint += f"?team_id={team_id}"
+
+                await client.delete(endpoint)
+                return {
+                    "success": True,
+                    "message": "Setup Assistant deleted successfully",
+                    "data": None,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to delete Setup Assistant: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to delete Setup Assistant: {str(e)}",
+                "data": None,
+            }
 
