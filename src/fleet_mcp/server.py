@@ -9,6 +9,7 @@ from .client import FleetClient
 from .config import FleetConfig, get_default_config_file, load_config
 from .tools import (
     host_tools,
+    label_tools,
     policy_tools,
     query_tools,
     query_tools_readonly,
@@ -112,6 +113,7 @@ class FleetMCPServer:
         """Register MCP tools with the server based on configuration."""
         # Always register read-only tools
         host_tools.register_read_tools(self.mcp, self.client)
+        label_tools.register_read_tools(self.mcp, self.client)
         query_tools.register_read_tools(self.mcp, self.client)
         policy_tools.register_read_tools(self.mcp, self.client)
         script_tools.register_read_tools(self.mcp, self.client)
@@ -130,6 +132,7 @@ class FleetMCPServer:
         # Only register full write tools if not in readonly mode
         if not self.config.readonly:
             host_tools.register_write_tools(self.mcp, self.client)
+            label_tools.register_write_tools(self.mcp, self.client)
             query_tools.register_write_tools(self.mcp, self.client)
             policy_tools.register_write_tools(self.mcp, self.client)
             script_tools.register_write_tools(self.mcp, self.client)

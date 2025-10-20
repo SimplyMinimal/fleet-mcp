@@ -215,6 +215,200 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "identifier": identifier,
             }
 
+    @mcp.tool()
+    async def fleet_list_host_upcoming_activities(
+        host_id: int,
+        page: int = 0,
+        per_page: int = 100,
+    ) -> dict[str, Any]:
+        """List upcoming activities for a specific host.
+
+        Args:
+            host_id: ID of the host to get upcoming activities for
+            page: Page number for pagination (0-based)
+            per_page: Number of activities per page
+
+        Returns:
+            Dict containing list of upcoming activities and pagination metadata.
+        """
+        try:
+            async with client:
+                params = {
+                    "page": page,
+                    "per_page": per_page,
+                }
+
+                response = await client.get(
+                    f"/hosts/{host_id}/activities/upcoming", params=params
+                )
+
+                if response.success and response.data:
+                    activities = response.data.get("activities", [])
+                    return {
+                        "success": True,
+                        "activities": activities,
+                        "count": len(activities),
+                        "host_id": host_id,
+                        "page": page,
+                        "per_page": per_page,
+                        "message": f"Found {len(activities)} upcoming activities for host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "activities": [],
+                        "count": 0,
+                        "host_id": host_id,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to list upcoming activities for host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list upcoming activities: {str(e)}",
+                "activities": [],
+                "count": 0,
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_list_host_past_activities(
+        host_id: int,
+        page: int = 0,
+        per_page: int = 100,
+    ) -> dict[str, Any]:
+        """List past activities for a specific host.
+
+        Args:
+            host_id: ID of the host to get past activities for
+            page: Page number for pagination (0-based)
+            per_page: Number of activities per page
+
+        Returns:
+            Dict containing list of past activities and pagination metadata.
+        """
+        try:
+            async with client:
+                params = {
+                    "page": page,
+                    "per_page": per_page,
+                }
+
+                response = await client.get(
+                    f"/hosts/{host_id}/activities", params=params
+                )
+
+                if response.success and response.data:
+                    activities = response.data.get("activities", [])
+                    return {
+                        "success": True,
+                        "activities": activities,
+                        "count": len(activities),
+                        "host_id": host_id,
+                        "page": page,
+                        "per_page": per_page,
+                        "message": f"Found {len(activities)} past activities for host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "activities": [],
+                        "count": 0,
+                        "host_id": host_id,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to list past activities for host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list past activities: {str(e)}",
+                "activities": [],
+                "count": 0,
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_get_host_mdm(host_id: int) -> dict[str, Any]:
+        """Get MDM information for a specific host.
+
+        Args:
+            host_id: ID of the host to get MDM information for
+
+        Returns:
+            Dict containing MDM information for the host.
+        """
+        try:
+            async with client:
+                response = await client.get(f"/hosts/{host_id}/mdm")
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "mdm": response.data,
+                        "host_id": host_id,
+                        "message": f"Retrieved MDM information for host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "mdm": None,
+                        "host_id": host_id,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to get MDM information for host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to get MDM information: {str(e)}",
+                "mdm": None,
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_list_host_certificates(host_id: int) -> dict[str, Any]:
+        """List certificates for a specific host.
+
+        Args:
+            host_id: ID of the host to get certificates for
+
+        Returns:
+            Dict containing list of certificates for the host.
+        """
+        try:
+            async with client:
+                response = await client.get(f"/hosts/{host_id}/certificates")
+
+                if response.success and response.data:
+                    certificates = response.data.get("certificates", [])
+                    return {
+                        "success": True,
+                        "certificates": certificates,
+                        "count": len(certificates),
+                        "host_id": host_id,
+                        "message": f"Found {len(certificates)} certificates for host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "certificates": [],
+                        "count": 0,
+                        "host_id": host_id,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to list certificates for host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to list certificates: {str(e)}",
+                "certificates": [],
+                "count": 0,
+                "host_id": host_id,
+            }
+
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register write host management tools with the MCP server.
@@ -404,4 +598,156 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "query": query,
                 "rows": [],
                 "row_count": 0,
+            }
+
+    @mcp.tool()
+    async def fleet_cancel_host_activity(
+        host_id: int, activity_id: str
+    ) -> dict[str, Any]:
+        """Cancel an upcoming activity for a specific host.
+
+        Args:
+            host_id: ID of the host
+            activity_id: ID of the activity to cancel
+
+        Returns:
+            Dict indicating success or failure of the cancellation.
+        """
+        try:
+            async with client:
+                response = await client.delete(
+                    f"/hosts/{host_id}/activities/upcoming/{activity_id}"
+                )
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Activity {activity_id} cancelled successfully for host {host_id}",
+                    "host_id": host_id,
+                    "activity_id": activity_id,
+                }
+
+        except FleetAPIError as e:
+            logger.error(
+                f"Failed to cancel activity {activity_id} for host {host_id}: {e}"
+            )
+            return {
+                "success": False,
+                "message": f"Failed to cancel activity: {str(e)}",
+                "host_id": host_id,
+                "activity_id": activity_id,
+            }
+
+    @mcp.tool()
+    async def fleet_lock_host(host_id: int) -> dict[str, Any]:
+        """Lock a host device remotely.
+
+        This sends a lock command to the host device. The device will be locked
+        and require authentication to unlock.
+
+        Args:
+            host_id: ID of the host to lock
+
+        Returns:
+            Dict containing lock status and any unlock PIN if applicable.
+        """
+        try:
+            async with client:
+                response = await client.post(f"/hosts/{host_id}/lock")
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "host_id": host_id,
+                        "device_status": response.data.get("device_status"),
+                        "pending_action": response.data.get("pending_action"),
+                        "unlock_pin": response.data.get("unlock_pin"),
+                        "message": f"Lock command sent to host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "host_id": host_id,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to lock host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to lock host: {str(e)}",
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_unlock_host(host_id: int) -> dict[str, Any]:
+        """Unlock a host device remotely.
+
+        This sends an unlock command to the host device. For some platforms,
+        this may return an unlock PIN that needs to be entered on the device.
+
+        Args:
+            host_id: ID of the host to unlock
+
+        Returns:
+            Dict containing unlock status and any unlock PIN if applicable.
+        """
+        try:
+            async with client:
+                response = await client.post(f"/hosts/{host_id}/unlock")
+
+                if response.success and response.data:
+                    return {
+                        "success": True,
+                        "host_id": host_id,
+                        "device_status": response.data.get("device_status"),
+                        "pending_action": response.data.get("pending_action"),
+                        "unlock_pin": response.data.get("unlock_pin"),
+                        "message": f"Unlock command sent to host {host_id}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": response.message,
+                        "host_id": host_id,
+                    }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to unlock host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to unlock host: {str(e)}",
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_unenroll_host_mdm(host_id: int) -> dict[str, Any]:
+        """Unenroll a host from MDM.
+
+        This removes the host from MDM management. The host will no longer
+        receive MDM profiles or commands.
+
+        Args:
+            host_id: ID of the host to unenroll from MDM
+
+        Returns:
+            Dict indicating success or failure of the unenrollment.
+        """
+        try:
+            async with client:
+                response = await client.delete(f"/hosts/{host_id}/mdm")
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Host {host_id} unenrolled from MDM successfully",
+                    "host_id": host_id,
+                }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to unenroll host {host_id} from MDM: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to unenroll host from MDM: {str(e)}",
+                "host_id": host_id,
             }

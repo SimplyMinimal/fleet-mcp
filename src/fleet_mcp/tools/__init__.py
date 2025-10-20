@@ -2,6 +2,7 @@
 
 from . import (
     host_tools,
+    label_tools,
     policy_tools,
     query_tools,
     query_tools_readonly,
@@ -13,6 +14,7 @@ from . import (
 
 __all__ = [
     "host_tools",
+    "label_tools",
     "query_tools",
     "query_tools_readonly",
     "policy_tools",
