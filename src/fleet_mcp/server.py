@@ -23,6 +23,7 @@ from .tools import (
     software_tools,
     table_tools,
     team_tools,
+    vpp_tools,
 )
 
 logger = logging.getLogger(__name__)
@@ -136,6 +137,7 @@ class FleetMCPServer:
         config_tools.register_read_tools(self.mcp, self.client)
         invite_tools.register_read_tools(self.mcp, self.client)
         mdm_tools.register_read_tools(self.mcp, self.client)
+        vpp_tools.register_read_tools(self.mcp, self.client)
 
         # Register SELECT-only query tools if in readonly mode with allow_select_queries
         if self.config.readonly and self.config.allow_select_queries:
@@ -155,6 +157,7 @@ class FleetMCPServer:
             config_tools.register_write_tools(self.mcp, self.client)
             invite_tools.register_write_tools(self.mcp, self.client)
             mdm_tools.register_write_tools(self.mcp, self.client)
+            vpp_tools.register_write_tools(self.mcp, self.client)
 
         # Register server health check tool (always available)
         self._register_health_check()

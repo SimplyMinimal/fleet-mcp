@@ -16,6 +16,7 @@ from . import (
     software_tools,
     table_tools,
     team_tools,
+    vpp_tools,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "software_tools",
     "table_tools",
     "team_tools",
+    "vpp_tools",
 ]

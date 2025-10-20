@@ -297,6 +297,86 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    async def fleet_upload_mdm_profile(
+        profile_content: str,
+        team_id: int | None = None,
+        labels: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Upload a new MDM configuration profile.
+
+        Uploads a custom MDM configuration profile (.mobileconfig for Apple,
+        .xml for Windows) to Fleet. The profile will be deployed to devices
+        based on team assignment and optional label filters.
+
+        Args:
+            profile_content: The profile content (XML/plist format)
+            team_id: Optional team ID to assign the profile to
+            labels: Optional list of label names to filter deployment
+
+        Returns:
+            Dict containing the created profile information.
+        """
+        try:
+            async with client:
+                payload: dict[str, Any] = {
+                    "profile": profile_content,
+                }
+                if team_id is not None:
+                    payload["team_id"] = team_id
+                if labels is not None:
+                    payload["labels"] = labels
+
+                response = await client.post(
+                    "/api/latest/fleet/configuration_profiles", json_data=payload
+                )
+                return {
+                    "success": True,
+                    "message": "MDM profile uploaded successfully",
+                    "data": response,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to upload MDM profile: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to upload profile: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
+    async def fleet_delete_mdm_profile(profile_uuid: str) -> dict[str, Any]:
+        """Delete an MDM configuration profile.
+
+        Removes a custom MDM configuration profile from Fleet. This will
+        also remove the profile from all devices where it's installed.
+
+        Note: Fleet-managed profiles (FileVault, etc.) cannot be deleted
+        using this endpoint.
+
+        Args:
+            profile_uuid: UUID of the profile to delete
+
+        Returns:
+            Dict containing the result of the deletion.
+        """
+        try:
+            async with client:
+                await client.delete(
+                    f"/api/latest/fleet/configuration_profiles/{profile_uuid}"
+                )
+                return {
+                    "success": True,
+                    "message": f"MDM profile {profile_uuid} deleted successfully",
+                    "data": None,
+                }
+        except FleetAPIError as e:
+            logger.error(f"Failed to delete MDM profile {profile_uuid}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to delete profile: {str(e)}",
+                "data": None,
+            }
+
+    @mcp.tool()
     async def fleet_lock_device(host_id: int) -> dict[str, Any]:
         """Lock an MDM-enrolled device remotely.
 
