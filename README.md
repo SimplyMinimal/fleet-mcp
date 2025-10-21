@@ -13,9 +13,34 @@ A Model Context Protocol (MCP) server that enables AI assistants to interact wit
 - **Read-Only Mode**: Safe exploration with optional SELECT-only query execution
 - **Activity Monitoring**: Track Fleet activities and audit logs
 
-## Installation
 
-### From PyPI (when published)
+## Quick Start
+Just want to dive right in? This will set up fleet-mcp with read-only access and SELECT query execution enabled. Just replace the `FLEET_SERVER_URL` and `FLEET_API_TOKEN` with your own.
+```json
+{
+  "mcpServers": {
+    "fleet": {
+      "command": "uvx",
+      "args": ["fleet-mcp", "run"],
+      "env": {
+        "FLEET_SERVER_URL": "https://your-fleet-instance.com",
+        "FLEET_API_TOKEN": "your-api-token",
+        "FLEET_READONLY": "true",
+        "FLEET_ALLOW_SELECT_QUERIES": "true"
+      }
+    }
+  }
+}
+```
+
+See the [Available Tools](#available-tools) section below for a complete list of tools.
+
+---
+<!-- 
+<details>
+<summary><b>Local Installation</b></summary>
+
+### From PyPI
 ```bash
 pip install fleet-mcp
 ```
@@ -33,10 +58,9 @@ git clone https://github.com/SimplyMinimal/fleet-mcp.git
 cd fleet-mcp
 uv sync --dev
 ```
+</details> -->
 
-## Quick Start
-
-### 1. Initialize Configuration
+<!-- ### 1. Initialize Configuration
 ```bash
 fleet-mcp init-config
 ```
@@ -59,11 +83,7 @@ fleet-mcp test
 ### 3. Run the MCP Server
 ```bash
 fleet-mcp run
-```
-
-### 4. Use with MCP Clients
-
-See the [MCP Client Configuration](#mcp-client-configuration) section below for detailed setup instructions for various clients.
+``` -->
 
 ## MCP Client Configuration
 
@@ -73,7 +93,7 @@ Fleet MCP can be integrated with various MCP-compatible clients. Below are confi
 
 Before configuring any MCP client, ensure you have:
 
-1. **Installed `uv`** (recommended) or `pip`:
+1. **Install `uv`** (recommended) or `pip`:
    ```bash
    # Install uv (recommended)
    curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -82,12 +102,22 @@ Before configuring any MCP client, ensure you have:
    pip install fleet-mcp
    ```
 
-2. **Fleet API Token**: Generate an API token from your Fleet instance:
+2. **Fleet API Token**: Generate an API token from your Fleet instance:  
+   Option 1) 
    - Log into Fleet UI
    - Navigate to: My account → Get API token
    - Copy the token for use in configuration
 
-3. **Fleet Server URL**: Your Fleet instance URL (e.g., `https://fleet.example.com`)
+   Option 2)
+   - Create an API-Only user with `fleetctl`
+   ```bash
+   # Generate an API-Only User and get the token
+   fleetctl user create --name Fleet-MCP --email <email> --password <password> --role admin --api-only
+   ```
+
+   > **Note**: This API token and your fleet instance URL (https://your-fleet-instance.com) will be used in the client configuration.
+
+3. **Pick Your Client**: Choose your preferred AI assistant client and follow the corresponding setup instructions below.
 
 <details>
 <summary><b>Install in Claude Desktop</b></summary>
@@ -396,33 +426,6 @@ For other MCP-compatible clients, use this general pattern:
 4. **Token Rotation**: Regularly rotate Fleet API tokens
 5. **Environment-Specific Configs**: Use separate configs for dev/prod
 
-## Licensing
-
-Fleet MCP uses a **dual-use licensing model**:
-
-- **Free for Development & Testing**: Use Fleet MCP without restrictions for local development, testing, evaluation, and non-commercial purposes
-- **Commercial License Required for Production**: Any production deployment or commercial use requires a registered commercial license
-
-### Quick Reference
-
-| Scenario | License Required |
-|----------|------------------|
-| Local development | ❌ No |
-| Testing & evaluation | ❌ No |
-| Commercial testing (14 days max) | ❌ No |
-| Production deployment | ✅ Yes |
-| Commercial services | ✅ Yes |
-
-### Learn More
-
-For detailed information about licensing, including:
-- When a license is required vs. optional
-- Examples of development vs. production use
-- How to obtain a commercial license
-- Frequently asked questions
-
-See the [LICENSING.md](LICENSING.md) file.
-
 ## Available Tools
 
 Fleet MCP provides 40+ tools organized into the following categories:
@@ -448,7 +451,11 @@ Fleet MCP provides 40+ tools organized into the following categories:
 ### Query Management (Write Operations)
 - `fleet_create_query` - Create a new saved query
 - `fleet_delete_query` - Delete a saved query
-- `fleet_run_live_query` - Execute a live query against specified hosts
+- `fleet_run_live_query` - Execute a live query against specified hosts (no results)
+- `fleet_query_hosts_batch` ⭐ - Run a query against multiple hosts concurrently with results
+- `fleet_query_hosts_aggregate` - Run a query and return aggregated results (count, unique, stats)
+- `fleet_query_hosts_smart` - Smart query with automatic host filtering and sampling
+- `fleet_query_hosts_paginated` - Query hosts in pages to avoid memory issues
 - `fleet_run_saved_query` - Run a saved query against hosts
 
 ### Policy Management (Read-Only)
@@ -530,10 +537,8 @@ Fleet MCP runs in **read-only mode by default** for safe exploration without ris
 | Mode | Config | Capabilities | Best For |
 |------|--------|--------------|----------|
 | **Strict Read-Only** (Default) | `readonly=true`<br>`allow_select_queries=false` | ✅ View all resources<br>❌ No query execution<br>❌ No modifications | Safe exploration |
-| **Read-Only + SELECT** | `readonly=true`<br>`allow_select_queries=true` | ✅ View all resources<br>✅ Run SELECT queries (validated)<br>❌ No modifications | Active monitoring |
+| **Read-Only + SELECT** | `readonly=true`<br>`allow_select_queries=true` | ✅ View all resources<br>✅ Run SELECT queries<br>❌ No modifications | Active monitoring |
 | **Full Write** | `readonly=false` | ✅ All operations<br>⚠️ AI can modify Fleet | Full management |
-
-**Query Validation:** In SELECT mode, queries are validated to block INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, REPLACE, MERGE.
 
 ### Configuration Examples
 
@@ -542,13 +547,15 @@ Fleet MCP runs in **read-only mode by default** for safe exploration without ris
 [fleet]
 readonly = true
 allow_select_queries = false
-
+```
+```toml
 # Read-Only with SELECT Queries
 [fleet]
 readonly = true
 allow_select_queries = true
-
-# Full Write Access (⚠️ Use with caution)
+```
+```toml
+# Full Write Access (⚠️ Use with caution) - Recommended to have LLM prompt for confirmation before making changes
 [fleet]
 readonly = false
 ```
@@ -594,6 +601,8 @@ readonly = false
 ```
 
 ## Development
+<details>
+<summary><b>Development Setup</b></summary>
 
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 
@@ -627,6 +636,7 @@ src/fleet_mcp/
 ├── tools/              # MCP tool implementations
 └── utils/              # Utilities (SQL validator, etc.)
 ```
+</details>
 
 ## Troubleshooting
 
@@ -678,14 +688,33 @@ src/fleet_mcp/
 
 </details>
 
-## Contributing
+## Licensing
 
-Contributions welcome! Fork → Create branch → Make changes → Run tests → Format code → Submit PR
+Fleet MCP uses a **dual-use licensing model**:
 
-## License
+- **Free for Development & Testing**: Use Fleet MCP without restrictions for local development, testing, evaluation, and non-commercial purposes
+- **Commercial License Required for Production**: Any production deployment or commercial use requires a registered commercial license
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Quick Reference
+
+| Scenario | License Required |
+|----------|------------------|
+| Local development | ❌ No |
+| Testing & evaluation | ❌ No |
+| Commercial testing (14 days max) | ❌ No |
+| Production deployment | ✅ Yes |
+| Commercial services | ✅ Yes |
+
+### Learn More
+
+For detailed information about licensing, including:
+- When a license is required vs. optional
+- Examples of development vs. production use
+- How to obtain a commercial license
+- Frequently asked questions
+
+See the [LICENSING.md](LICENSING.md) file.
 
 ## Disclaimer
 
-This project is not affiliated with or endorsed by Fleet DM. It is an independent implementation of the Model Context Protocol for interacting with Fleet DM instances.
+This project is not affiliated with or endorsed by Fleet DM. It is an independent implementation of the Model Context Protocol for interacting with [Fleet](https://fleetdm.com) instances.
