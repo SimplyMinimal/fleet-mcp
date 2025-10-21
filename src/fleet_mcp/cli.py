@@ -1,5 +1,6 @@
 """Command-line interface for Fleet MCP."""
 
+import asyncio
 import logging
 import sys
 from pathlib import Path
@@ -103,29 +104,116 @@ def run(ctx: click.Context) -> None:
         sys.exit(1)
 
 
+async def _run_connection_test(config: FleetConfig) -> None:
+    """Run the actual connection test (async helper)."""
+    from .client import FleetClient
+
+    async with FleetClient(config) as client:
+        response = await client.health_check()
+
+        if response.success:
+            click.echo("   Status: ✅ Connected")
+            click.echo("   Authentication: ✅ Successful")
+            click.echo()
+            click.echo("=" * 50)
+            click.echo("Connection test passed. Fleet MCP is ready to use.")
+            click.echo()
+        else:
+            click.echo("   Status: ❌ Failed")
+            click.echo(f"   Error: {response.message}")
+            click.echo()
+            click.echo("=" * 50)
+            click.echo("❌ Connection test failed.")
+            click.echo()
+            click.echo("Troubleshooting tips:")
+            click.echo("  • Verify your Fleet server URL is correct")
+            click.echo("  • Check that your API token is valid")
+            click.echo("  • Ensure the Fleet server is accessible from your network")
+            click.echo("  • Check if SSL verification needs to be disabled (verify_ssl = false)")
+            sys.exit(1)
+
+
 @cli.command()
 @click.pass_context
-async def test(ctx: click.Context) -> None:
+def test(ctx: click.Context) -> None:
     """Test connection to Fleet server."""
-    config = _load_config(ctx)
+    click.echo("Fleet MCP Connection Test")
+    click.echo("=" * 50)
+    click.echo()
+
+    # Step 1: Configuration validation
+    click.echo("* Configuration Validation")
+    click.echo("-" * 50)
+
+    # Determine config source
+    config_file = ctx.obj.get("config_file") if ctx.obj else None
+    if config_file:
+        config_source = f"Config file: {config_file}"
+    else:
+        default_config = get_default_config_file()
+        if default_config.exists():
+            config_source = f"Config file: {default_config}"
+        else:
+            config_source = "Environment variables"
+
+    click.echo(f"   Source: {config_source}")
 
     try:
-        from .client import FleetClient
+        config = _load_config(ctx)
+        click.echo("   Status: Valid")
+        click.echo()
 
-        async with FleetClient(config) as client:
-            response = await client.health_check()
+        # Step 2: Display connection details
+        click.echo("* Connection Details")
+        click.echo("-" * 50)
+        click.echo(f"   Fleet Server: {config.server_url}")
+        click.echo(f"   SSL Verification: {'Enabled' if config.verify_ssl else 'Disabled'}")
+        click.echo(f"   Timeout: {config.timeout}s")
+        click.echo(f"   Max Retries: {config.max_retries}")
+        click.echo()
 
-            if response.success:
-                click.echo(
-                    f"✅ Successfully connected to Fleet server at {config.server_url}"
-                )
-                click.echo("   Authentication: OK")
+        # Step 3: Display mode configuration
+        click.echo("* Mode Configuration")
+        click.echo("-" * 50)
+        if config.readonly:
+            click.echo("   Mode: Read-Only")
+            if config.allow_select_queries:
+                click.echo("   SELECT Queries: Enabled")
             else:
-                click.echo(f"❌ Failed to connect to Fleet server: {response.message}")
-                sys.exit(1)
+                click.echo("   SELECT Queries: Disabled")
+        else:
+            click.echo("   Mode: ⚠️  Full Write Access")
+        click.echo()
+
+        # Step 4: Test connection
+        click.echo("* Connection Test")
+        click.echo("-" * 50)
+        click.echo(f"   Testing connection to {config.server_url}...")
 
     except Exception as e:
-        click.echo(f"❌ Connection test failed: {e}", err=True)
+        click.echo(f"   Status: Invalid")
+        click.echo(f"   Error: {e}")
+        click.echo()
+        click.echo("Configuration validation failed. Please check your configuration.")
+        sys.exit(1)
+
+    # Perform actual connection test
+    try:
+        asyncio.run(_run_connection_test(config))
+
+    except Exception as e:
+        click.echo("   Status: Failed")
+        click.echo(f"   Error: {e}")
+        click.echo()
+        click.echo("=" * 50)
+        click.echo("Connection test failed.")
+        click.echo()
+        click.echo("Troubleshooting tips:")
+        click.echo("  • Verify your Fleet server URL is correct")
+        click.echo("  • Check that your API token is valid")
+        click.echo("  • Ensure the Fleet server is accessible from your network")
+        click.echo("  • Check if SSL verification needs to be disabled (verify_ssl = false)")
+        click.echo(f"  • Error details: {e}")
         sys.exit(1)
 
 
@@ -166,11 +254,11 @@ max_retries = 3
                 return
 
         output.write_text(config_template)
-        click.echo(f"✅ Configuration template created at {output}")
+        click.echo(f"Configuration template created at {output}")
         click.echo("Please edit the file and add your Fleet server URL and API token.")
 
     except Exception as e:
-        click.echo(f"❌ Failed to create configuration file: {e}", err=True)
+        click.echo(f"!! Failed to create configuration file: {e}", err=True)
         sys.exit(1)
 
 
