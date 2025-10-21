@@ -522,3 +522,141 @@ class TestServerHealthCheck:
             assert "fleet_user" in result_str
             assert "fleet_user_role" in result_str
             assert "admin@example.com" in result_str
+
+    @pytest.mark.asyncio
+    async def test_preload_schema_cache_with_cache(self, mock_config, tmp_path):
+        """Test _preload_schema_cache with existing cache."""
+        # Create a mock cache file
+        cache_dir = tmp_path / ".fleet-mcp" / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / "osquery_fleet_schema.json"
+
+        # Write mock schema data with 100+ tables for healthy status
+        mock_schema = {}
+        for i in range(100):
+            mock_schema[f"table_{i}"] = {
+                "description": f"Test table {i}",
+                "platforms": ["darwin", "linux", "windows"],
+                "columns": [{"name": "id", "type": "bigint"}],
+            }
+
+        with open(cache_file, "w") as f:
+            json.dump(mock_schema, f)
+
+        # Mock the cache file path
+        with (
+            patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file),
+            patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir),
+            patch("fleet_mcp.tools.table_discovery._table_cache", None),
+        ):
+            server = FleetMCPServer(mock_config)
+
+            # Call preload method
+            await server._preload_schema_cache()
+
+            # Verify cache was loaded by checking the global cache
+            from fleet_mcp.tools.table_discovery import get_table_cache
+
+            cache = await get_table_cache()
+            assert len(cache.fleet_schemas) == 100
+            assert cache.fleet_schemas_loaded is True
+
+    @pytest.mark.asyncio
+    async def test_preload_schema_cache_no_cache(self, mock_config, tmp_path):
+        """Test _preload_schema_cache when cache doesn't exist."""
+        # Use a non-existent cache file
+        cache_dir = tmp_path / ".fleet-mcp" / "cache"
+        cache_file = cache_dir / "osquery_fleet_schema.json"
+
+        with (
+            patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file),
+            patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir),
+            patch("fleet_mcp.tools.table_discovery._table_cache", None),
+        ):
+            # Mock the schema download to fail
+            with patch(
+                "fleet_mcp.tools.table_discovery.TableSchemaCache._download_fleet_schema",
+                side_effect=Exception("Download failed"),
+            ):
+                server = FleetMCPServer(mock_config)
+
+                # Call preload method - should not raise exception
+                await server._preload_schema_cache()
+
+                # Verify cache was attempted to be loaded
+                from fleet_mcp.tools.table_discovery import get_table_cache
+
+                cache = await get_table_cache()
+                # Should fall back to bundled schemas
+                assert cache.fleet_schemas_loaded is True
+
+    @pytest.mark.asyncio
+    async def test_preload_schema_cache_with_overrides(self, mock_config, tmp_path):
+        """Test _preload_schema_cache with schema overrides."""
+        # Create mock cache files
+        cache_dir = tmp_path / ".fleet-mcp" / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / "osquery_fleet_schema.json"
+        overrides_file = cache_dir / "osquery_schema_overrides.json"
+
+        # Write mock schema data
+        mock_schema = {}
+        for i in range(100):
+            mock_schema[f"table_{i}"] = {
+                "description": f"Test table {i}",
+                "platforms": ["darwin", "linux", "windows"],
+                "columns": [{"name": "id", "type": "bigint"}],
+            }
+
+        with open(cache_file, "w") as f:
+            json.dump(mock_schema, f)
+
+        # Write mock overrides
+        mock_overrides = {
+            "table_0": {
+                "notes": "Special requirements for table_0",
+                "examples": ["SELECT * FROM table_0;"],
+            }
+        }
+
+        with open(overrides_file, "w") as f:
+            json.dump(mock_overrides, f)
+
+        # Mock the cache file paths
+        with (
+            patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file),
+            patch(
+                "fleet_mcp.tools.table_discovery.SCHEMA_OVERRIDES_CACHE_FILE",
+                overrides_file,
+            ),
+            patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir),
+            patch("fleet_mcp.tools.table_discovery._table_cache", None),
+        ):
+            server = FleetMCPServer(mock_config)
+
+            # Call preload method
+            await server._preload_schema_cache()
+
+            # Verify cache and overrides were loaded
+            from fleet_mcp.tools.table_discovery import get_table_cache
+
+            cache = await get_table_cache()
+            assert len(cache.fleet_schemas) == 100
+            assert len(cache.schema_overrides) == 1
+            assert cache.overrides_loaded is True
+
+    @pytest.mark.asyncio
+    async def test_preload_schema_cache_error_handling(self, mock_config):
+        """Test that _preload_schema_cache handles errors gracefully."""
+        server = FleetMCPServer(mock_config)
+
+        # Mock get_table_cache to raise an exception
+        with patch(
+            "fleet_mcp.tools.table_discovery.get_table_cache",
+            side_effect=Exception("Cache initialization error"),
+        ):
+            # Should not raise exception
+            await server._preload_schema_cache()
+
+            # Server should still be functional
+            assert server.config == mock_config

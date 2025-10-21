@@ -360,9 +360,68 @@ class FleetMCPServer:
                     "status": "error",
                 }
 
+    async def _preload_schema_cache(self) -> None:
+        """Preload osquery table schema cache during server startup.
+
+        This method loads the schema cache into memory before the server starts
+        accepting requests, improving initial response times for schema-related queries.
+        The cache loading is non-blocking and gracefully handles cases where the cache
+        doesn't exist yet (it will be populated on first schema request).
+        """
+        try:
+            from .tools.table_discovery import get_table_cache
+
+            logger.info("Preloading osquery table schema cache...")
+            cache = await get_table_cache()
+
+            # Get cache info for logging
+            cache_info = cache.get_cache_info()
+
+            # Log cache status
+            if cache_info["loaded_schemas_count"] > 0:
+                source = cache_info.get("schema_source", "unknown")
+                logger.info(
+                    f"Schema cache loaded: {cache_info['loaded_schemas_count']} tables "
+                    f"(source: {source})"
+                )
+
+                # Log overrides if available
+                overrides_count = cache_info.get("loaded_overrides_count", 0)
+                if overrides_count > 0:
+                    overrides_source = cache_info.get("overrides_source", "unknown")
+                    logger.info(
+                        f"Schema overrides loaded: {overrides_count} tables "
+                        f"(source: {overrides_source})"
+                    )
+
+                # Log warnings if any
+                if cache_info.get("loading_warnings"):
+                    for warning in cache_info["loading_warnings"]:
+                        logger.warning(f"Schema cache warning: {warning}")
+            else:
+                logger.info(
+                    "Schema cache empty, will populate on first use"
+                )
+
+            # Log errors if any
+            if cache_info.get("loading_errors"):
+                for error in cache_info["loading_errors"]:
+                    logger.error(f"Schema cache error: {error}")
+
+        except Exception as e:
+            # Don't fail server startup if cache preload fails
+            logger.warning(f"Failed to preload schema cache: {e}")
+            logger.info("Schema cache will be loaded on first use")
+
     def run(self) -> None:
         """Run the MCP server."""
+        import asyncio
+
         logger.info(f"Starting Fleet MCP Server for {self.config.server_url}")
+
+        # Preload schema cache before starting server
+        asyncio.run(self._preload_schema_cache())
+
         self.mcp.run()
 
 
