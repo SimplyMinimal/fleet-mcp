@@ -45,7 +45,7 @@ class TestFleetRequirePasswordReset:
                     "email": "user@example.com",
                     "name": "Test User",
                     "force_password_reset": True,
-                    "updated_at": "2024-01-15T10:30:00Z"
+                    "updated_at": "2024-01-15T10:30:00Z",
                 }
             },
             message="Password reset required successfully",
@@ -94,7 +94,9 @@ class TestFleetRequirePasswordReset:
         with patch.object(
             fleet_client,
             "post",
-            side_effect=FleetAPIError("Cannot reset password for SSO user", status_code=400),
+            side_effect=FleetAPIError(
+                "Cannot reset password for SSO user", status_code=400
+            ),
         ):
             user_tools.register_write_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
@@ -110,7 +112,7 @@ class TestFleetRequirePasswordReset:
                     "email": "user@example.com",
                     "name": "Test User",
                     "force_password_reset": True,
-                    "updated_at": "2024-01-15T10:30:00Z"
+                    "updated_at": "2024-01-15T10:30:00Z",
                 }
             },
             message="Password reset already required",
@@ -131,7 +133,7 @@ class TestFleetRequirePasswordReset:
                     "email": "admin@example.com",
                     "name": "Admin User",
                     "force_password_reset": True,
-                    "updated_at": "2024-01-15T10:30:00Z"
+                    "updated_at": "2024-01-15T10:30:00Z",
                 }
             },
             message="Password reset required for current user",
@@ -162,4 +164,3 @@ class TestFleetRequirePasswordReset:
         ):
             user_tools.register_write_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
-

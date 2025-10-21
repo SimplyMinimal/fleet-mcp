@@ -65,7 +65,9 @@ class TestScriptToolsIntegration:
             async with live_fleet_client:
                 response = await live_fleet_client.get("/scripts/batch")
 
-                assert response.success, f"Failed to list batch scripts: {response.message}"
+                assert (
+                    response.success
+                ), f"Failed to list batch scripts: {response.message}"
                 assert response.data is not None, "No data in response"
 
                 # Check for batch executions list
@@ -75,7 +77,9 @@ class TestScriptToolsIntegration:
                 # If there are executions, verify structure
                 if executions:
                     execution = executions[0]
-                    assert "batch_execution_id" in execution, "Execution missing 'batch_execution_id'"
+                    assert (
+                        "batch_execution_id" in execution
+                    ), "Execution missing 'batch_execution_id'"
                     assert "status" in execution, "Execution missing 'status'"
 
         except Exception as e:
@@ -89,7 +93,9 @@ class TestScriptToolsIntegration:
                 script_content = "#!/bin/bash\necho 'test script'"
                 files = {"script": ("test_script.sh", script_content)}
 
-                response = await live_fleet_client.post_multipart("/scripts", files=files)
+                response = await live_fleet_client.post_multipart(
+                    "/scripts", files=files
+                )
 
                 assert response.success, f"Failed to create script: {response.message}"
                 assert response.data is not None, "No data in response"
@@ -116,7 +122,9 @@ class TestScriptToolsIntegration:
                 script_content = "#!/bin/bash\necho 'original'"
                 files = {"script": ("test_script.sh", script_content)}
 
-                response = await live_fleet_client.post_multipart("/scripts", files=files)
+                response = await live_fleet_client.post_multipart(
+                    "/scripts", files=files
+                )
                 assert response.success, "Failed to create script"
 
                 script_id = response.data.get("script_id")
@@ -187,7 +195,9 @@ class TestScriptToolsIntegration:
                     "script_contents": "#!/bin/bash\necho 'hello'",
                 }
 
-                response = await live_fleet_client.post("/scripts/run", json_data=json_data)
+                response = await live_fleet_client.post(
+                    "/scripts/run", json_data=json_data
+                )
 
                 # This may fail if the host is offline, which is acceptable
                 if response.success:
@@ -198,4 +208,3 @@ class TestScriptToolsIntegration:
 
         except Exception as e:
             pytest.skip(f"Run script failed: {e}")
-

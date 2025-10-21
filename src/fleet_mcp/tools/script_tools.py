@@ -143,7 +143,9 @@ async def validate_script_host_team_compatibility(
             return True, None
 
     except FleetAPIError as e:
-        logger.error(f"Failed to validate team compatibility for script {script_id} and host {host_id}: {e}")
+        logger.error(
+            f"Failed to validate team compatibility for script {script_id} and host {host_id}: {e}"
+        )
         return False, f"Failed to validate team compatibility: {str(e)}"
 
 
@@ -267,7 +269,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                response = await client.get(f"/api/v1/fleet/scripts/results/{execution_id}")
+                response = await client.get(
+                    f"/api/v1/fleet/scripts/results/{execution_id}"
+                )
 
                 if response.success and response.data:
                     result = response.data
@@ -321,7 +325,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 if status:
                     params["status"] = status
 
-                response = await client.get("/api/v1/fleet/scripts/batch", params=params)
+                response = await client.get(
+                    "/api/v1/fleet/scripts/batch", params=params
+                )
 
                 if response.success and response.data:
                     executions = response.data.get("batch_executions", [])
@@ -360,7 +366,9 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                response = await client.get(f"/api/v1/fleet/scripts/batch/{batch_execution_id}")
+                response = await client.get(
+                    f"/api/v1/fleet/scripts/batch/{batch_execution_id}"
+                )
 
                 if response.success and response.data:
                     batch = response.data
@@ -434,9 +442,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     }
 
         except FleetAPIError as e:
-            logger.error(
-                f"Failed to list batch script hosts {batch_execution_id}: {e}"
-            )
+            logger.error(f"Failed to list batch script hosts {batch_execution_id}: {e}")
             return {
                 "success": False,
                 "message": f"Failed to list batch script hosts: {str(e)}",
@@ -576,8 +582,10 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     json_data["script_id"] = script_id
 
                     # Proactive team validation for saved scripts
-                    is_compatible, error_msg = await validate_script_host_team_compatibility(
-                        client, script_id, host_id
+                    is_compatible, error_msg = (
+                        await validate_script_host_team_compatibility(
+                            client, script_id, host_id
+                        )
                     )
                     if not is_compatible:
                         logger.warning(f"Team compatibility check failed: {error_msg}")
@@ -607,7 +615,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     json_data["script_name"] = script_name
                     json_data["team_id"] = team_id
 
-                response = await client.post("/api/v1/fleet/scripts/run", json_data=json_data)
+                response = await client.post(
+                    "/api/v1/fleet/scripts/run", json_data=json_data
+                )
 
                 if response.success and response.data:
                     return {
@@ -625,7 +635,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     }
 
         except FleetValidationError as e:
-            logger.error(f"Failed to run script on host {host_id} - validation error: {e}")
+            logger.error(
+                f"Failed to run script on host {host_id} - validation error: {e}"
+            )
             logger.debug(f"Response data: {e.response_data}")
             error_details = extract_error_details(e)
             return {
@@ -694,7 +706,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 if not_before:
                     json_data["not_before"] = not_before
 
-                response = await client.post("/api/v1/fleet/scripts/run/batch", json_data=json_data)
+                response = await client.post(
+                    "/api/v1/fleet/scripts/run/batch", json_data=json_data
+                )
 
                 if response.success and response.data:
                     return {
@@ -765,7 +779,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     }
 
         except FleetValidationError as e:
-            logger.error(f"Failed to cancel batch script {batch_execution_id} - validation error: {e}")
+            logger.error(
+                f"Failed to cancel batch script {batch_execution_id} - validation error: {e}"
+            )
             logger.debug(f"Response data: {e.response_data}")
             error_details = extract_error_details(e)
             return {
@@ -806,17 +822,17 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             # Validate script based on file extension
-            file_ext = script_name.lower().split('.')[-1] if '.' in script_name else ''
+            file_ext = script_name.lower().split(".")[-1] if "." in script_name else ""
 
-            if file_ext == 'sh':
+            if file_ext == "sh":
                 # Validate that .sh scripts have a shebang
-                if not script_contents.strip().startswith('#!'):
+                if not script_contents.strip().startswith("#!"):
                     return {
                         "success": False,
                         "message": "Shell scripts (.sh) must start with a shebang line (e.g., #!/bin/bash)",
                         "script_id": None,
                     }
-            elif file_ext == 'ps1':
+            elif file_ext == "ps1":
                 # PowerShell scripts don't require shebang, upload as-is
                 pass
             # Other file types are allowed without specific validation
@@ -829,7 +845,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     # Convert team_id to string for multipart form data
                     data["team_id"] = str(team_id)
 
-                response = await client.post_multipart("/api/v1/fleet/scripts", files=files, data=data)
+                response = await client.post_multipart(
+                    "/api/v1/fleet/scripts", files=files, data=data
+                )
 
                 if response.success and response.data:
                     return {
@@ -888,11 +906,13 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         try:
             # Validate script based on file extension if script_name is provided
             if script_name:
-                file_ext = script_name.lower().split('.')[-1] if '.' in script_name else ''
+                file_ext = (
+                    script_name.lower().split(".")[-1] if "." in script_name else ""
+                )
 
-                if file_ext == 'sh':
+                if file_ext == "sh":
                     # Validate that .sh scripts have a shebang
-                    if not script_contents.strip().startswith('#!'):
+                    if not script_contents.strip().startswith("#!"):
                         return {
                             "success": False,
                             "message": "Shell scripts (.sh) must start with a shebang line (e.g., #!/bin/bash)",
@@ -982,4 +1002,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to delete script: {error_details}",
                 "script_id": script_id,
             }
-

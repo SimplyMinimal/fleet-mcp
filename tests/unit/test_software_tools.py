@@ -39,10 +39,7 @@ class TestFleetBatchSetSoftware:
         """Test successful batch software upload."""
         mock_response = FleetResponse(
             success=True,
-            data={
-                "request_uuid": "abc-123-def-456",
-                "software_count": 3
-            },
+            data={"request_uuid": "abc-123-def-456", "software_count": 3},
             message="Batch software upload initiated",
         )
 
@@ -62,8 +59,12 @@ class TestFleetBatchSetSoftware:
                 "validation_results": [
                     {"software_title": "Chrome", "valid": True},
                     {"software_title": "Firefox", "valid": True},
-                    {"software_title": "Invalid", "valid": False, "error": "Invalid package"}
-                ]
+                    {
+                        "software_title": "Invalid",
+                        "valid": False,
+                        "error": "Invalid package",
+                    },
+                ],
             },
             message="Dry run completed",
         )
@@ -121,11 +122,7 @@ class TestFleetBatchSetSoftware:
         """Test batch software upload with team ID."""
         mock_response = FleetResponse(
             success=True,
-            data={
-                "request_uuid": "xyz-789-abc-123",
-                "software_count": 2,
-                "team_id": 5
-            },
+            data={"request_uuid": "xyz-789-abc-123", "software_count": 2, "team_id": 5},
             message="Batch software upload initiated for team",
         )
 
@@ -138,10 +135,7 @@ class TestFleetBatchSetSoftware:
         """Test handling of large software batch."""
         mock_response = FleetResponse(
             success=True,
-            data={
-                "request_uuid": "large-batch-uuid",
-                "software_count": 100
-            },
+            data={"request_uuid": "large-batch-uuid", "software_count": 100},
             message="Large batch software upload initiated",
         )
 
@@ -159,4 +153,3 @@ class TestFleetBatchSetSoftware:
         ):
             software_tools.register_write_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
-

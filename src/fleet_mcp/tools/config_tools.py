@@ -199,9 +199,11 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 )
                 return {
                     "success": True,
-                    "message": "Updated Fleet configuration"
-                    if not dry_run
-                    else "Configuration validation passed",
+                    "message": (
+                        "Updated Fleet configuration"
+                        if not dry_run
+                        else "Configuration validation passed"
+                    ),
                     "data": response,
                 }
         except FleetAPIError as e:
@@ -242,9 +244,11 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 )
                 return {
                     "success": True,
-                    "message": "Updated enrollment secrets"
-                    if not dry_run
-                    else "Enrollment secrets validation passed",
+                    "message": (
+                        "Updated enrollment secrets"
+                        if not dry_run
+                        else "Enrollment secrets validation passed"
+                    ),
                     "data": None,
                 }
         except FleetAPIError as e:
@@ -254,4 +258,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to update enrollment secrets: {str(e)}",
                 "data": None,
             }
-

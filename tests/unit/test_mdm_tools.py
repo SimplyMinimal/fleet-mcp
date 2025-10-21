@@ -48,7 +48,7 @@ class TestFleetListMdmAppleInstallers:
                         "manifest": "https://example.com/manifest.plist",
                         "installer": "https://example.com/installer.pkg",
                         "created_at": "2024-01-15T10:00:00Z",
-                        "updated_at": "2024-01-15T10:00:00Z"
+                        "updated_at": "2024-01-15T10:00:00Z",
                     },
                     {
                         "id": 2,
@@ -57,8 +57,8 @@ class TestFleetListMdmAppleInstallers:
                         "manifest": "https://example.com/manifest2.plist",
                         "installer": "https://example.com/installer2.pkg",
                         "created_at": "2024-01-16T11:00:00Z",
-                        "updated_at": "2024-01-16T11:00:00Z"
-                    }
+                        "updated_at": "2024-01-16T11:00:00Z",
+                    },
                 ]
             },
             message="Success",
@@ -131,7 +131,7 @@ class TestFleetUploadMdmAppleInstaller:
                     "manifest": "https://example.com/manifest3.plist",
                     "installer": "https://example.com/installer3.pkg",
                     "created_at": "2024-01-17T12:00:00Z",
-                    "updated_at": "2024-01-17T12:00:00Z"
+                    "updated_at": "2024-01-17T12:00:00Z",
                 }
             },
             message="Installer uploaded successfully",
@@ -228,4 +228,3 @@ class TestFleetUploadMdmAppleInstaller:
         ):
             mdm_tools.register_write_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
-

@@ -129,7 +129,9 @@ async def _run_connection_test(config: FleetConfig) -> None:
             click.echo("  • Verify your Fleet server URL is correct")
             click.echo("  • Check that your API token is valid")
             click.echo("  • Ensure the Fleet server is accessible from your network")
-            click.echo("  • Check if SSL verification needs to be disabled (verify_ssl = false)")
+            click.echo(
+                "  • Check if SSL verification needs to be disabled (verify_ssl = false)"
+            )
             sys.exit(1)
 
 
@@ -167,7 +169,9 @@ def test(ctx: click.Context) -> None:
         click.echo("* Connection Details")
         click.echo("-" * 50)
         click.echo(f"   Fleet Server: {config.server_url}")
-        click.echo(f"   SSL Verification: {'Enabled' if config.verify_ssl else 'Disabled'}")
+        click.echo(
+            f"   SSL Verification: {'Enabled' if config.verify_ssl else 'Disabled'}"
+        )
         click.echo(f"   Timeout: {config.timeout}s")
         click.echo(f"   Max Retries: {config.max_retries}")
         click.echo()
@@ -212,7 +216,9 @@ def test(ctx: click.Context) -> None:
         click.echo("  • Verify your Fleet server URL is correct")
         click.echo("  • Check that your API token is valid")
         click.echo("  • Ensure the Fleet server is accessible from your network")
-        click.echo("  • Check if SSL verification needs to be disabled (verify_ssl = false)")
+        click.echo(
+            "  • Check if SSL verification needs to be disabled (verify_ssl = false)"
+        )
         click.echo(f"  • Error details: {e}")
         sys.exit(1)
 

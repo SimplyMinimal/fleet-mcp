@@ -218,7 +218,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 if query is not None:
                     json_data["query"] = query
 
-                response = await client.patch(f"/labels/{label_id}", json_data=json_data)
+                response = await client.patch(
+                    f"/labels/{label_id}", json_data=json_data
+                )
 
                 if response.success and response.data:
                     label = response.data.get("label")
@@ -258,7 +260,8 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 return {
                     "success": response.success,
-                    "message": response.message or f"Label '{label_name}' deleted successfully",
+                    "message": response.message
+                    or f"Label '{label_name}' deleted successfully",
                     "label_name": label_name,
                 }
 
@@ -269,4 +272,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to delete label: {str(e)}",
                 "label_name": label_name,
             }
-

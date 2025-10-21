@@ -263,4 +263,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to delete pack: {str(e)}",
                 "data": None,
             }
-

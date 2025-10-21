@@ -58,9 +58,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "order_key": order_key,
                     "order_direction": order_direction,
                 }
-                response = await client.get(
-                    "/api/latest/fleet/invites", params=params
-                )
+                response = await client.get("/api/latest/fleet/invites", params=params)
                 data = response.data or {}
                 invites = data.get("invites", [])
                 return {
@@ -266,4 +264,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to delete invite: {str(e)}",
                 "data": None,
             }
-

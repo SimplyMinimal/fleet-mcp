@@ -83,4 +83,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
     # No write tools for device management currently
     pass
-

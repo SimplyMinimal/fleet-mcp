@@ -67,7 +67,15 @@ class TestReadOnlyMode:
         )
         assert config.readonly is False
 
-    @patch.dict("os.environ", {"FLEET_READONLY": "true", "FLEET_SERVER_URL": "https://test.example.com", "FLEET_API_TOKEN": "test-token"}, clear=True)
+    @patch.dict(
+        "os.environ",
+        {
+            "FLEET_READONLY": "true",
+            "FLEET_SERVER_URL": "https://test.example.com",
+            "FLEET_API_TOKEN": "test-token",
+        },
+        clear=True,
+    )
     def test_readonly_from_env_true(self):
         """Test setting readonly via environment variable (true)."""
         config = FleetConfig()
@@ -98,31 +106,71 @@ class TestReadOnlyMode:
         )
         assert config.allow_select_queries is False
 
-    @patch.dict("os.environ", {"FLEET_ALLOW_SELECT_QUERIES": "true", "FLEET_SERVER_URL": "https://test.example.com", "FLEET_API_TOKEN": "test-token"}, clear=True)
+    @patch.dict(
+        "os.environ",
+        {
+            "FLEET_ALLOW_SELECT_QUERIES": "true",
+            "FLEET_SERVER_URL": "https://test.example.com",
+            "FLEET_API_TOKEN": "test-token",
+        },
+        clear=True,
+    )
     def test_allow_select_queries_from_env_true(self):
         """Test setting allow_select_queries via environment variable (true)."""
         config = FleetConfig()
         assert config.allow_select_queries is True
 
-    @patch.dict("os.environ", {"FLEET_ALLOW_SELECT_QUERIES": "false", "FLEET_SERVER_URL": "https://test.example.com", "FLEET_API_TOKEN": "test-token"}, clear=True)
+    @patch.dict(
+        "os.environ",
+        {
+            "FLEET_ALLOW_SELECT_QUERIES": "false",
+            "FLEET_SERVER_URL": "https://test.example.com",
+            "FLEET_API_TOKEN": "test-token",
+        },
+        clear=True,
+    )
     def test_allow_select_queries_from_env_false(self):
         """Test setting allow_select_queries via environment variable (false)."""
         config = FleetConfig()
         assert config.allow_select_queries is False
 
-    @patch.dict("os.environ", {"FLEET_READONLY": "false", "FLEET_SERVER_URL": "https://test.example.com", "FLEET_API_TOKEN": "test-token"}, clear=True)
+    @patch.dict(
+        "os.environ",
+        {
+            "FLEET_READONLY": "false",
+            "FLEET_SERVER_URL": "https://test.example.com",
+            "FLEET_API_TOKEN": "test-token",
+        },
+        clear=True,
+    )
     def test_readonly_from_env_false(self):
         """Test setting readonly via environment variable (false)."""
         config = FleetConfig()
         assert config.readonly is False
 
-    @patch.dict("os.environ", {"FLEET_READONLY": "1", "FLEET_SERVER_URL": "https://test.example.com", "FLEET_API_TOKEN": "test-token"}, clear=True)
+    @patch.dict(
+        "os.environ",
+        {
+            "FLEET_READONLY": "1",
+            "FLEET_SERVER_URL": "https://test.example.com",
+            "FLEET_API_TOKEN": "test-token",
+        },
+        clear=True,
+    )
     def test_readonly_from_env_truthy(self):
         """Test setting readonly via environment variable (truthy value)."""
         config = FleetConfig()
         assert config.readonly is True
 
-    @patch.dict("os.environ", {"FLEET_READONLY": "0", "FLEET_SERVER_URL": "https://test.example.com", "FLEET_API_TOKEN": "test-token"}, clear=True)
+    @patch.dict(
+        "os.environ",
+        {
+            "FLEET_READONLY": "0",
+            "FLEET_SERVER_URL": "https://test.example.com",
+            "FLEET_API_TOKEN": "test-token",
+        },
+        clear=True,
+    )
     def test_readonly_from_env_falsy(self):
         """Test setting readonly via environment variable (falsy value)."""
         config = FleetConfig()

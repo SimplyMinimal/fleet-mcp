@@ -171,8 +171,14 @@ class TestFleetClient:
 
                 assert response.success is True
                 assert response.status_code == 202
-                assert response.data["execution_id"] == "84aca157-252b-4be3-af63-598b09204c87"
-                assert "accepted" in response.message.lower() or "queued" in response.message.lower()
+                assert (
+                    response.data["execution_id"]
+                    == "84aca157-252b-4be3-af63-598b09204c87"
+                )
+                assert (
+                    "accepted" in response.message.lower()
+                    or "queued" in response.message.lower()
+                )
 
     @pytest.mark.asyncio
     async def test_bad_request_error_400(self, fleet_client):
@@ -216,7 +222,9 @@ class TestFleetClient:
         mock_response = httpx.Response(
             status_code=404,
             json={"message": "Script not found"},
-            request=httpx.Request("GET", "https://test.fleet.com/api/v1/fleet/scripts/999"),
+            request=httpx.Request(
+                "GET", "https://test.fleet.com/api/v1/fleet/scripts/999"
+            ),
         )
 
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):

@@ -14,9 +14,7 @@ from ..client import FleetClient
 logger = logging.getLogger(__name__)
 
 # Official Fleet osquery schema URL
-FLEET_SCHEMA_URL = (
-    "https://raw.githubusercontent.com/fleetdm/fleet/main/schema/osquery_fleet_schema.json"
-)
+FLEET_SCHEMA_URL = "https://raw.githubusercontent.com/fleetdm/fleet/main/schema/osquery_fleet_schema.json"
 
 # Fleet schema overrides base URL
 FLEET_SCHEMA_OVERRIDES_BASE_URL = (
@@ -278,9 +276,7 @@ class TableSchemaCache:
             table_list = schema_json
         else:
             # Convert dict format to list format
-            table_list = [
-                {"name": name, **data} for name, data in schema_json.items()
-            ]
+            table_list = [{"name": name, **data} for name, data in schema_json.items()]
 
         for table_data in table_list:
             table_name = table_data.get("name")
@@ -403,7 +399,9 @@ class TableSchemaCache:
         Returns:
             Dictionary mapping table names to override dictionaries
         """
-        logger.debug(f"Downloading schema overrides from {FLEET_SCHEMA_OVERRIDES_BASE_URL}")
+        logger.debug(
+            f"Downloading schema overrides from {FLEET_SCHEMA_OVERRIDES_BASE_URL}"
+        )
 
         overrides = {}
 
@@ -784,7 +782,9 @@ class TableSchemaCache:
         overrides_cache_size = None
 
         if overrides_cache_exists:
-            overrides_cache_age = time.time() - SCHEMA_OVERRIDES_CACHE_FILE.stat().st_mtime
+            overrides_cache_age = (
+                time.time() - SCHEMA_OVERRIDES_CACHE_FILE.stat().st_mtime
+            )
             overrides_cache_size = SCHEMA_OVERRIDES_CACHE_FILE.stat().st_size
 
         return {
@@ -807,7 +807,9 @@ class TableSchemaCache:
             "overrides_cache_file": str(SCHEMA_OVERRIDES_CACHE_FILE),
             "overrides_cache_exists": overrides_cache_exists,
             "overrides_cache_age_seconds": overrides_cache_age,
-            "overrides_cache_age_hours": overrides_cache_age / 3600 if overrides_cache_age else None,
+            "overrides_cache_age_hours": (
+                overrides_cache_age / 3600 if overrides_cache_age else None
+            ),
             "overrides_cache_size_bytes": overrides_cache_size,
             "loaded_overrides_count": len(self.schema_overrides),
             "overrides_source": self.overrides_source,

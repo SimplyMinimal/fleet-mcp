@@ -31,9 +31,7 @@ class TestFleetSchemaDownload:
             # Verify some common tables exist
             common_tables = ["processes", "users", "system_info"]
             for table in common_tables:
-                assert (
-                    table in schemas
-                ), f"Common table '{table}' should be in schema"
+                assert table in schemas, f"Common table '{table}' should be in schema"
 
             # Verify schema structure
             for table_name, table_schema in list(schemas.items())[:5]:
@@ -183,14 +181,14 @@ class TestFleetSchemaDownload:
                 ), f"Table '{table_name}' should support platform '{platform}'"
 
             # Check has description
-            assert (
-                schema["description"]
-            ), f"Table '{table_name}' should have description"
+            assert schema[
+                "description"
+            ], f"Table '{table_name}' should have description"
 
             # Check has column details
-            assert (
-                schema["column_details"]
-            ), f"Table '{table_name}' should have column details"
+            assert schema[
+                "column_details"
+            ], f"Table '{table_name}' should have column details"
 
             print(f"✓ Table '{table_name}' has quality metadata")
 
@@ -214,4 +212,3 @@ class TestFleetSchemaDownload:
 
         except Exception as e:
             pytest.skip(f"Could not test force refresh: {e}")
-

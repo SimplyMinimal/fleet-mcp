@@ -54,15 +54,12 @@ class TestFleetGetDeviceInfo:
                     "primary_ip": "192.168.1.100",
                     "primary_mac": "00:11:22:33:44:55",
                     "last_enrolled_at": "2024-01-15T10:00:00Z",
-                    "detail_updated_at": "2024-01-17T12:30:00Z"
+                    "detail_updated_at": "2024-01-17T12:30:00Z",
                 },
                 "org_logo_url": "https://example.com/logo.png",
                 "org_logo_url_light_background": "https://example.com/logo-light.png",
                 "org_contact_url": "https://example.com/contact",
-                "license": {
-                    "tier": "premium",
-                    "expiration": "2025-01-15T00:00:00Z"
-                }
+                "license": {"tier": "premium", "expiration": "2025-01-15T00:00:00Z"},
             },
             message="Success",
         )
@@ -125,12 +122,12 @@ class TestFleetGetDeviceInfo:
                     "id": 456,
                     "hostname": "test-device",
                     "platform": "ubuntu",
-                    "status": "offline"
+                    "status": "offline",
                 },
                 "org_logo_url": None,
                 "org_logo_url_light_background": None,
                 "org_contact_url": None,
-                "license": None
+                "license": None,
             },
             message="Success",
         )
@@ -155,19 +152,19 @@ class TestFleetGetDeviceInfo:
                             "id": 1,
                             "name": "Firewall Enabled",
                             "query": "SELECT * FROM firewall",
-                            "response": "pass"
+                            "response": "pass",
                         },
                         {
                             "id": 2,
                             "name": "Disk Encryption",
                             "query": "SELECT * FROM disk_encryption",
-                            "response": "fail"
-                        }
-                    ]
+                            "response": "fail",
+                        },
+                    ],
                 },
                 "org_logo_url": "https://example.com/logo.png",
                 "org_contact_url": "https://example.com/contact",
-                "license": {"tier": "free"}
+                "license": {"tier": "free"},
             },
             message="Success",
         )
@@ -192,19 +189,19 @@ class TestFleetGetDeviceInfo:
                             "id": 1,
                             "name": "Google Chrome",
                             "version": "120.0.6099.109",
-                            "source": "apps"
+                            "source": "apps",
                         },
                         {
                             "id": 2,
                             "name": "Slack",
                             "version": "4.36.140",
-                            "source": "apps"
-                        }
-                    ]
+                            "source": "apps",
+                        },
+                    ],
                 },
                 "org_logo_url": "https://example.com/logo.png",
                 "org_contact_url": "https://example.com/contact",
-                "license": {"tier": "premium"}
+                "license": {"tier": "premium"},
             },
             message="Success",
         )
@@ -234,4 +231,3 @@ class TestFleetGetDeviceInfo:
         ):
             device_tools.register_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
-

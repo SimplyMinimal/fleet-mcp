@@ -76,7 +76,9 @@ class TestSchemaOverrides:
     """Test schema override functionality."""
 
     @pytest.mark.asyncio
-    async def test_merge_overrides_with_schema(self, mock_base_schema, mock_override_yaml):
+    async def test_merge_overrides_with_schema(
+        self, mock_base_schema, mock_override_yaml
+    ):
         """Test merging override data with base schema."""
         cache = TableSchemaCache()
         cache.fleet_schemas = mock_base_schema
@@ -251,4 +253,3 @@ class TestSchemaOverrides:
             assert len(overrides) == 2
             assert "vscode_extensions" in overrides
             assert "chrome_extensions" in overrides
-

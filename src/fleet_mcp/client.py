@@ -216,7 +216,9 @@ class FleetClient:
 
             elif response.status_code == 403:
                 error_data = self._parse_error_response(response)
-                error_msg = error_data.get("message", "Permission denied or feature disabled")
+                error_msg = error_data.get(
+                    "message", "Permission denied or feature disabled"
+                )
                 raise FleetPermissionError(
                     f"Forbidden: {error_msg}",
                     status_code=response.status_code,
@@ -252,7 +254,9 @@ class FleetClient:
 
             else:
                 error_data = self._parse_error_response(response)
-                error_msg = error_data.get("message", f"Request failed with status {response.status_code}")
+                error_msg = error_data.get(
+                    "message", f"Request failed with status {response.status_code}"
+                )
                 raise FleetAPIError(
                     f"API error: {error_msg}",
                     status_code=response.status_code,
@@ -420,7 +424,9 @@ class FleetClient:
 
             elif response.status_code == 403:
                 error_data = self._parse_error_response(response)
-                error_msg = error_data.get("message", "Permission denied or feature disabled")
+                error_msg = error_data.get(
+                    "message", "Permission denied or feature disabled"
+                )
                 raise FleetPermissionError(
                     f"Forbidden: {error_msg}",
                     status_code=response.status_code,
@@ -456,8 +462,12 @@ class FleetClient:
 
             else:
                 error_data = self._parse_error_response(response)
-                error_msg = error_data.get("message", f"Request failed with status {response.status_code}")
-                logger.error(f"POST multipart failed with status {response.status_code}: {error_data}")
+                error_msg = error_data.get(
+                    "message", f"Request failed with status {response.status_code}"
+                )
+                logger.error(
+                    f"POST multipart failed with status {response.status_code}: {error_data}"
+                )
                 raise FleetAPIError(
                     f"API error: {error_msg}",
                     status_code=response.status_code,
@@ -553,7 +563,9 @@ class FleetClient:
 
             elif response.status_code == 403:
                 error_data = self._parse_error_response(response)
-                error_msg = error_data.get("message", "Permission denied or feature disabled")
+                error_msg = error_data.get(
+                    "message", "Permission denied or feature disabled"
+                )
                 raise FleetPermissionError(
                     f"Forbidden: {error_msg}",
                     status_code=response.status_code,
@@ -589,7 +601,9 @@ class FleetClient:
 
             else:
                 error_data = self._parse_error_response(response)
-                error_msg = error_data.get("message", f"Request failed with status {response.status_code}")
+                error_msg = error_data.get(
+                    "message", f"Request failed with status {response.status_code}"
+                )
                 raise FleetAPIError(
                     f"API error: {error_msg}",
                     status_code=response.status_code,

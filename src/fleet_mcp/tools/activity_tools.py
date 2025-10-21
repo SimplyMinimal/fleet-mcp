@@ -75,4 +75,3 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to list activities: {str(e)}",
                 "data": None,
             }
-

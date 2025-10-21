@@ -288,7 +288,11 @@ class FleetMCPServer:
 
             # Extract teams information
             teams = user_data.get("teams", [])
-            team_ids = [team.get("id") for team in teams if isinstance(team, dict) and "id" in team]
+            team_ids = [
+                team.get("id")
+                for team in teams
+                if isinstance(team, dict) and "id" in team
+            ]
 
             return {
                 "fleet_user_role": role,

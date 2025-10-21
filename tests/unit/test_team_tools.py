@@ -47,7 +47,9 @@ class TestFleetListTeamUsers:
                         "email": "john@example.com",
                         "role": "admin",
                         "global_role": None,
-                        "teams": [{"id": 1, "name": "Engineering", "role": "maintainer"}]
+                        "teams": [
+                            {"id": 1, "name": "Engineering", "role": "maintainer"}
+                        ],
                     },
                     {
                         "id": 2,
@@ -55,8 +57,8 @@ class TestFleetListTeamUsers:
                         "email": "jane@example.com",
                         "role": "observer",
                         "global_role": None,
-                        "teams": [{"id": 1, "name": "Engineering", "role": "observer"}]
-                    }
+                        "teams": [{"id": 1, "name": "Engineering", "role": "observer"}],
+                    },
                 ]
             },
             message="Success",
@@ -115,7 +117,7 @@ class TestFleetGetTeamSecrets:
                     {
                         "secret": "abc123def456",
                         "created_at": "2024-01-15T10:00:00Z",
-                        "team_id": 1
+                        "team_id": 1,
                     }
                 ]
             },
@@ -159,13 +161,7 @@ class TestFleetAddTeamUsers:
         """Test successful addition of users to team."""
         mock_response = FleetResponse(
             success=True,
-            data={
-                "team": {
-                    "id": 1,
-                    "name": "Engineering",
-                    "user_count": 5
-                }
-            },
+            data={"team": {"id": 1, "name": "Engineering", "user_count": 5}},
             message="Users added successfully",
         )
 
@@ -277,4 +273,3 @@ class TestFleetRemoveTeamUser:
         ):
             team_tools.register_write_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
-

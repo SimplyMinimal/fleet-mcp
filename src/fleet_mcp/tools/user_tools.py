@@ -167,9 +167,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                response = await client.get(
-                    f"/api/latest/fleet/sessions/{session_id}"
-                )
+                response = await client.get(f"/api/latest/fleet/sessions/{session_id}")
                 return {
                     "success": True,
                     "message": f"Retrieved session {session_id}",
@@ -316,7 +314,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to update user: {str(e)}",
                 "data": None,
             }
-        
+
     # TODO: Disabled for now as it is too dangerous. Revisit later if really needed.
     # @mcp.tool()
     # async def fleet_delete_user(user_id: int) -> dict[str, Any]:
@@ -445,4 +443,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     #             "user_id": user_id,
     #             "require": require,
     #         }
-

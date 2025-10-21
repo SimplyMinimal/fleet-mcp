@@ -120,12 +120,9 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
                     "data": response,
                 }
         except FleetAPIError as e:
-            logger.error(
-                f"Failed to get block {block_id} from carve {carve_id}: {e}"
-            )
+            logger.error(f"Failed to get block {block_id} from carve {carve_id}: {e}")
             return {
                 "success": False,
                 "message": f"Failed to get carve block: {str(e)}",
                 "data": None,
             }
-

@@ -256,9 +256,7 @@ class TestScriptToolsErrorHandling:
     @pytest.mark.asyncio
     async def test_list_scripts_api_error(self, fleet_client, mock_mcp):
         """Test handling API error when listing scripts."""
-        with patch.object(
-            fleet_client, "get", side_effect=FleetAPIError("API Error")
-        ):
+        with patch.object(fleet_client, "get", side_effect=FleetAPIError("API Error")):
             script_tools.register_read_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
 
@@ -273,4 +271,3 @@ class TestScriptToolsErrorHandling:
         """Test error when script contents exceed size limit."""
         script_tools.register_write_tools(mock_mcp, fleet_client)
         assert mock_mcp.tool.called
-

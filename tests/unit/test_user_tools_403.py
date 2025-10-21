@@ -57,19 +57,13 @@ class TestUserTools403Handling:
         )
 
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):
-            with patch.object(
-                fleet_client, "get", side_effect=error
-            ) as mock_get:
+            with patch.object(fleet_client, "get", side_effect=error) as mock_get:
                 # Get the tool function
                 tools = await mcp_server.list_tools()
-                list_users_tool = next(
-                    t for t in tools if t.name == "fleet_list_users"
-                )
+                list_users_tool = next(t for t in tools if t.name == "fleet_list_users")
 
                 # Call the tool
-                result = await mcp_server.call_tool(
-                    list_users_tool.name, arguments={}
-                )
+                result = await mcp_server.call_tool(list_users_tool.name, arguments={})
 
                 # Verify the error message is helpful
                 assert result is not None
@@ -77,8 +71,7 @@ class TestUserTools403Handling:
                 result_str = str(result)
                 assert "403" in result_str or "Forbidden" in result_str
                 assert (
-                    "admin" in result_str.lower()
-                    or "permission" in result_str.lower()
+                    "admin" in result_str.lower() or "permission" in result_str.lower()
                 )
 
     @pytest.mark.asyncio
@@ -102,14 +95,10 @@ class TestUserTools403Handling:
         )
 
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):
-            with patch.object(
-                fleet_client, "get", side_effect=error
-            ) as mock_get:
+            with patch.object(fleet_client, "get", side_effect=error) as mock_get:
                 # Get the tool function
                 tools = await mcp_server.list_tools()
-                get_user_tool = next(
-                    t for t in tools if t.name == "fleet_get_user"
-                )
+                get_user_tool = next(t for t in tools if t.name == "fleet_get_user")
 
                 # Call the tool
                 result = await mcp_server.call_tool(
@@ -121,8 +110,7 @@ class TestUserTools403Handling:
                 result_str = str(result)
                 assert "403" in result_str or "Forbidden" in result_str
                 assert (
-                    "admin" in result_str.lower()
-                    or "permission" in result_str.lower()
+                    "admin" in result_str.lower() or "permission" in result_str.lower()
                 )
 
     @pytest.mark.asyncio
@@ -146,19 +134,13 @@ class TestUserTools403Handling:
         )
 
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):
-            with patch.object(
-                fleet_client, "get", side_effect=error
-            ) as mock_get:
+            with patch.object(fleet_client, "get", side_effect=error) as mock_get:
                 # Get the tool function
                 tools = await mcp_server.list_tools()
-                list_users_tool = next(
-                    t for t in tools if t.name == "fleet_list_users"
-                )
+                list_users_tool = next(t for t in tools if t.name == "fleet_list_users")
 
                 # Call the tool
-                result = await mcp_server.call_tool(
-                    list_users_tool.name, arguments={}
-                )
+                result = await mcp_server.call_tool(list_users_tool.name, arguments={})
 
                 # Verify the error message doesn't mention admin permissions
                 assert result is not None
@@ -191,17 +173,12 @@ class TestUserTools403Handling:
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):
             # Get the tool function
             tools = await mcp_server.list_tools()
-            list_users_tool = next(
-                t for t in tools if t.name == "fleet_list_users"
-            )
+            list_users_tool = next(t for t in tools if t.name == "fleet_list_users")
 
             # Call the tool
-            result = await mcp_server.call_tool(
-                list_users_tool.name, arguments={}
-            )
+            result = await mcp_server.call_tool(list_users_tool.name, arguments={})
 
             # Verify success
             assert result is not None
             result_str = str(result)
             assert "Admin User" in result_str or "success" in result_str.lower()
-

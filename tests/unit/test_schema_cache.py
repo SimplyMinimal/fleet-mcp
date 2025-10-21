@@ -157,7 +157,9 @@ class TestTableSchemaCache:
             json.dump(mock_schema_json, f)
 
         # Mock the cache file path
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             with patch("fleet_mcp.tools.table_discovery.CACHE_DIR", test_cache_dir):
                 # Test with fresh cache (should load from cache)
                 await cache._load_fleet_schemas(force_refresh=False)
@@ -184,7 +186,9 @@ class TestTableSchemaCache:
         mock_response.json.return_value = mock_schema_json
         mock_response.raise_for_status = MagicMock()
 
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             with patch("fleet_mcp.tools.table_discovery.CACHE_DIR", test_cache_dir):
                 with patch("httpx.AsyncClient") as mock_client:
                     mock_client.return_value.__aenter__.return_value.get = AsyncMock(
@@ -208,7 +212,9 @@ class TestTableSchemaCache:
         cache = TableSchemaCache()
 
         # Mock HTTP client to fail
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             with patch("fleet_mcp.tools.table_discovery.CACHE_DIR", test_cache_dir):
                 with patch("httpx.AsyncClient") as mock_client:
                     mock_client.return_value.__aenter__.return_value.get = AsyncMock(
@@ -238,7 +244,9 @@ class TestTableSchemaCache:
         with open(test_cache_file, "w") as f:
             json.dump({"test": "data"}, f)
 
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             info = cache.get_cache_info()
 
             assert info["cache_exists"] is True
@@ -295,8 +303,18 @@ class TestTableSchemaCache:
                 "platforms": ["darwin", "linux", "windows"],
                 "evented": False,
                 "columns": [
-                    {"name": "id", "type": "BIGINT", "description": "ID", "required": False},
-                    {"name": "name", "type": "TEXT", "description": "Name", "required": False},
+                    {
+                        "name": "id",
+                        "type": "BIGINT",
+                        "description": "ID",
+                        "required": False,
+                    },
+                    {
+                        "name": "name",
+                        "type": "TEXT",
+                        "description": "Name",
+                        "required": False,
+                    },
                 ],
                 "examples": f"SELECT * FROM table_{i:03d};",
                 "notes": None,
@@ -306,7 +324,9 @@ class TestTableSchemaCache:
             json.dump(large_schema, f)
 
         # Load from cache
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             with patch("fleet_mcp.tools.table_discovery.CACHE_DIR", test_cache_dir):
                 await cache._load_fleet_schemas(force_refresh=False)
 
@@ -343,7 +363,9 @@ class TestTableSchemaCache:
             json.dump(large_schema, f)
 
         # Mock the cache file path and reset the global cache
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             with patch("fleet_mcp.tools.table_discovery.CACHE_DIR", test_cache_dir):
                 with patch("fleet_mcp.tools.table_discovery._table_cache", None):
                     # Get the global cache instance
@@ -371,7 +393,9 @@ class TestTableSchemaCache:
             json.dump(small_schema, f)
 
         # Load from cache
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             await cache._load_fleet_schemas(force_refresh=False)
 
             info = cache.get_cache_info()
@@ -400,7 +424,9 @@ class TestTableSchemaCache:
             json.dump(healthy_schema, f)
 
         # Load from cache
-        with patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file):
+        with patch(
+            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", test_cache_file
+        ):
             await cache._load_fleet_schemas(force_refresh=False)
 
             info = cache.get_cache_info()
@@ -408,4 +434,3 @@ class TestTableSchemaCache:
             # Should NOT have warning about low table count
             assert info["loaded_schemas_count"] == 100
             assert not any("Low table count" in w for w in info["loading_warnings"])
-

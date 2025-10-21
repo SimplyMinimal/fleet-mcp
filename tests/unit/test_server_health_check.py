@@ -30,6 +30,7 @@ class TestServerHealthCheck:
         """
         # Reset before test
         import fleet_mcp.tools.table_discovery as td
+
         original_cache = td._table_cache
         td._table_cache = None
 
@@ -72,10 +73,10 @@ class TestServerHealthCheck:
             json.dump(mock_schema, f)
 
         # Mock the cache file path and reset the global cache
-        with patch(
-            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file
-        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir), patch(
-            "fleet_mcp.tools.table_discovery._table_cache", None
+        with (
+            patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file),
+            patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir),
+            patch("fleet_mcp.tools.table_discovery._table_cache", None),
         ):
             cache_info = await FleetMCPServer._get_cache_info()
 
@@ -109,10 +110,10 @@ class TestServerHealthCheck:
         cache_dir = tmp_path / ".fleet-mcp" / "cache"
         cache_file = cache_dir / "osquery_fleet_schema.json"
 
-        with patch(
-            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file
-        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir), patch(
-            "fleet_mcp.tools.table_discovery._table_cache", None
+        with (
+            patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file),
+            patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir),
+            patch("fleet_mcp.tools.table_discovery._table_cache", None),
         ):
             # Mock the schema download to fail (so we don't create cache)
             with patch(
@@ -160,10 +161,10 @@ class TestServerHealthCheck:
             json.dump(mock_schema, f)
 
         # Mock the cache file path and reset the global cache
-        with patch(
-            "fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file
-        ), patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir), patch(
-            "fleet_mcp.tools.table_discovery._table_cache", None
+        with (
+            patch("fleet_mcp.tools.table_discovery.SCHEMA_CACHE_FILE", cache_file),
+            patch("fleet_mcp.tools.table_discovery.CACHE_DIR", cache_dir),
+            patch("fleet_mcp.tools.table_discovery._table_cache", None),
         ):
             cache_info = await FleetMCPServer._get_cache_info()
 
@@ -173,7 +174,9 @@ class TestServerHealthCheck:
             assert cache_info["status"] == "healthy"
             assert len(cache_info["errors"]) == 0
             # Should not have low table count warning
-            low_count_warnings = [w for w in cache_info["warnings"] if "Low table count" in w]
+            low_count_warnings = [
+                w for w in cache_info["warnings"] if "Low table count" in w
+            ]
             assert len(low_count_warnings) == 0
 
     @pytest.mark.asyncio
@@ -413,11 +416,15 @@ class TestServerHealthCheck:
             assert user_info["fleet_user_email"] == "observer@example.com"
             assert user_info["fleet_user_name"] == "Observer User"
             assert user_info["fleet_user_global_role"] == "observer"
-            assert user_info["fleet_user_teams"] is None  # Should be None, not empty list
+            assert (
+                user_info["fleet_user_teams"] is None
+            )  # Should be None, not empty list
             assert user_info["fleet_user_error"] is None
 
     @pytest.mark.asyncio
-    async def test_get_fleet_user_info_uses_user_teams_not_available_teams(self, mock_config):
+    async def test_get_fleet_user_info_uses_user_teams_not_available_teams(
+        self, mock_config
+    ):
         """Test that _get_fleet_user_info uses user.teams, not available_teams.
 
         The API response includes both user.teams (teams the user is a member of)
@@ -493,10 +500,9 @@ class TestServerHealthCheck:
             "fleet_user_error": None,
         }
 
-        with patch.object(
-            httpx.AsyncClient, "request", return_value=mock_response
-        ), patch.object(
-            server, "_get_fleet_user_info", return_value=mock_user_info
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=mock_response),
+            patch.object(server, "_get_fleet_user_info", return_value=mock_user_info),
         ):
             # Call the health check tool using the MCP server's call_tool method
             result = await server.mcp.call_tool("fleet_health_check", arguments={})
@@ -504,6 +510,7 @@ class TestServerHealthCheck:
             # The result is a list of TextContent objects, so we need to parse it
             # Extract the actual result from the response
             import json
+
             result_str = str(result)
 
             # Verify server_config is included in the result
@@ -515,4 +522,3 @@ class TestServerHealthCheck:
             assert "fleet_user" in result_str
             assert "fleet_user_role" in result_str
             assert "admin@example.com" in result_str
-

@@ -460,9 +460,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
     @mcp.tool()
-    async def fleet_add_team_users(
-        team_id: int, user_ids: list[int]
-    ) -> dict[str, Any]:
+    async def fleet_add_team_users(team_id: int, user_ids: list[int]) -> dict[str, Any]:
         """Add one or more users to a specific team.
 
         Args:

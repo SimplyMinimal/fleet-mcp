@@ -150,9 +150,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                await client.delete(
-                    f"/api/latest/fleet/custom_variables/{secret_id}"
-                )
+                await client.delete(f"/api/latest/fleet/custom_variables/{secret_id}")
                 return {
                     "success": True,
                     "message": f"Deleted secret variable {secret_id}",
@@ -165,4 +163,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to delete secret variable: {str(e)}",
                 "data": None,
             }
-

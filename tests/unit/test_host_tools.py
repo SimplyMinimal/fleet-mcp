@@ -41,18 +41,14 @@ class TestFleetGetHostMacadmins:
             success=True,
             data={
                 "macadmins": {
-                    "munki": {
-                        "version": "5.2.3",
-                        "errors": [],
-                        "warnings": []
-                    },
+                    "munki": {"version": "5.2.3", "errors": [], "warnings": []},
                     "munki_issues": [],
                     "mobile_device_management": {
                         "enrollment_status": "On (automatic)",
                         "server_url": "https://mdm.example.com",
                         "name": "Example MDM",
-                        "id": "12345"
-                    }
+                        "id": "12345",
+                    },
                 }
             },
             message="Success",
@@ -98,10 +94,7 @@ class TestFleetGetHostDeviceMapping:
             success=True,
             data={
                 "device_mapping": [
-                    {
-                        "email": "user@example.com",
-                        "source": "google_chrome_profiles"
-                    }
+                    {"email": "user@example.com", "source": "google_chrome_profiles"}
                 ]
             },
             message="Success",
@@ -148,8 +141,8 @@ class TestFleetGetHostEncryptionKey:
                 "host_id": 123,
                 "encryption_key": {
                     "key": "ABC123-DEF456-GHI789",
-                    "updated_at": "2024-01-15T10:30:00Z"
-                }
+                    "updated_at": "2024-01-15T10:30:00Z",
+                },
             },
             message="Success",
         )
@@ -233,4 +226,3 @@ class TestFleetRefetchHost:
         ):
             host_tools.register_write_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
-

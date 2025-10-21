@@ -914,4 +914,3 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "message": f"Failed to upload Apple MDM installer: {str(e)}",
                 "installer": {},
             }
-
