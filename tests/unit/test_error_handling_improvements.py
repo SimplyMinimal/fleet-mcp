@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from mcp.server.fastmcp import FastMCP
 
 from fleet_mcp.client import FleetAPIError, FleetClient, FleetResponse
 from fleet_mcp.config import FleetConfig
@@ -11,7 +12,6 @@ from fleet_mcp.tools.activity_tools import (
     register_read_tools as register_activity_tools,
 )
 from fleet_mcp.tools.user_tools import register_read_tools as register_user_tools
-from mcp.server.fastmcp import FastMCP
 
 
 @pytest.fixture
