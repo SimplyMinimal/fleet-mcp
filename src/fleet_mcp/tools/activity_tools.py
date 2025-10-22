@@ -61,7 +61,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 response = await client.get(
                     "/api/latest/fleet/activities", params=params
                 )
-                data = response.data or {}
+
+                # Explicit success check to prevent incorrect success reporting
+                if not response.success or not response.data:
+                    return {
+                        "success": False,
+                        "message": response.message or "No data returned from API",
+                        "data": None,
+                    }
+
+                data = response.data
                 activities = data.get("activities", [])
                 return {
                     "success": True,
@@ -70,6 +79,19 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 }
         except FleetAPIError as e:
             logger.error(f"Failed to list activities: {e}")
+
+            # Provide helpful message for 403 Forbidden errors
+            if e.status_code == 403:
+                return {
+                    "success": False,
+                    "message": (
+                        "Failed to list activities: Access denied (403 Forbidden). "
+                        "This endpoint requires appropriate permissions. "
+                        "Please verify that your API token has the necessary privileges."
+                    ),
+                    "data": None,
+                }
+
             return {
                 "success": False,
                 "message": f"Failed to list activities: {str(e)}",

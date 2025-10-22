@@ -67,7 +67,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     params["team_id"] = team_id
 
                 response = await client.get("/api/latest/fleet/users", params=params)
-                data = response.data or {}
+
+                # Explicit success check to prevent incorrect success reporting
+                if not response.success or not response.data:
+                    return {
+                        "success": False,
+                        "message": response.message or "No data returned from API",
+                        "data": None,
+                    }
+
+                data = response.data
                 users = data.get("users", [])
                 return {
                     "success": True,
@@ -76,6 +85,19 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 }
         except FleetAPIError as e:
             logger.error(f"Failed to list users: {e}")
+
+            # Provide helpful message for 403 Forbidden errors
+            if e.status_code == 403:
+                return {
+                    "success": False,
+                    "message": (
+                        "Failed to list users: Access denied (403 Forbidden). "
+                        "This endpoint requires admin-level permissions. "
+                        "Please verify that your API token has admin privileges."
+                    ),
+                    "data": None,
+                }
+
             return {
                 "success": False,
                 "message": f"Failed to list users: {str(e)}",
@@ -108,16 +130,41 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     f"/api/latest/fleet/users/{user_id}",
                     params=params if params else None,
                 )
+
+                # Explicit success check to prevent incorrect success reporting
+                if not response.success or not response.data:
+                    return {
+                        "success": False,
+                        "message": response.message or "No data returned from API",
+                        "user_id": user_id,
+                        "data": None,
+                    }
+
                 return {
                     "success": True,
                     "message": f"Retrieved user {user_id}",
-                    "data": response,
+                    "data": response.data,
                 }
         except FleetAPIError as e:
             logger.error(f"Failed to get user {user_id}: {e}")
+
+            # Provide helpful message for 403 Forbidden errors
+            if e.status_code == 403:
+                return {
+                    "success": False,
+                    "message": (
+                        "Failed to get user: Access denied (403 Forbidden). "
+                        "This endpoint requires admin-level permissions. "
+                        "Please verify that your API token has admin privileges."
+                    ),
+                    "user_id": user_id,
+                    "data": None,
+                }
+
             return {
                 "success": False,
-                "message": f"Failed to get user: {str(e)}",
+                "message": f"Failed to get user {user_id}: {str(e)}",
+                "user_id": user_id,
                 "data": None,
             }
 

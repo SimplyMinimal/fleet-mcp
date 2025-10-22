@@ -7,7 +7,7 @@ import pytest
 
 from fleet_mcp.client import FleetAPIError, FleetClient
 from fleet_mcp.config import FleetConfig
-from fleet_mcp.tools.team_tools import register_read_tools
+from fleet_mcp.tools.user_tools import register_read_tools
 from mcp.server.fastmcp import FastMCP
 
 
