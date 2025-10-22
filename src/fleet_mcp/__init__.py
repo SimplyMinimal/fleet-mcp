@@ -5,8 +5,8 @@ enabling agentic AIs to manage devices, run queries, enforce policies,
 and monitor security across fleets of computers.
 """
 
-__version__ = "1.0.1"
-__author__ = "Fleet MCP Contributors"
+__version__ = "1.0.2"
+__author__ = "SimplyMinimal"
 __email__ = "fleet-mcp@example.com"
 
 from .client import FleetClient
