@@ -122,7 +122,8 @@ class FleetMCPServer:
     def _register_tools(self) -> None:
         """Register MCP tools with the server based on configuration."""
         # Always register read-only tools
-        host_tools.register_read_tools(self.mcp, self.client)
+        # Note: host_tools.register_read_tools() is conditionally registered below
+        # to avoid duplicates with query_tools_readonly in SELECT-only mode
         label_tools.register_read_tools(self.mcp, self.client)
         pack_tools.register_read_tools(self.mcp, self.client)
         carve_tools.register_tools(
@@ -147,9 +148,23 @@ class FleetMCPServer:
             self.mcp, self.client
         )  # Device tools are all read-only
 
-        # Register SELECT-only query tools if in readonly mode with allow_select_queries
+        # Register query execution tools based on mode
+        # This prevents duplicate registrations of query execution tools
         if self.config.readonly and self.config.allow_select_queries:
+            # In readonly mode with SELECT queries enabled:
+            # - Register SELECT-only validated query tools from query_tools_readonly
+            # - These include: fleet_run_live_query, fleet_run_saved_query,
+            #   fleet_query_host, fleet_query_host_by_identifier (all with SELECT validation)
+            # - Do NOT register host_tools.register_read_tools() to avoid duplicates
             query_tools_readonly.register_select_only_tools(self.mcp, self.client)
+        else:
+            # In normal mode or readonly without SELECT queries:
+            # - Always register host_tools.register_read_tools() for host query tools
+            #   (fleet_query_host, fleet_query_host_by_identifier)
+            # - In write mode, query_tools.register_write_tools() will also register
+            #   fleet_run_live_query and fleet_run_saved_query (without SELECT validation)
+            # - In readonly mode without SELECT, only host query tools are available
+            host_tools.register_read_tools(self.mcp, self.client)
 
         # Only register full write tools if not in readonly mode
         if not self.config.readonly:
