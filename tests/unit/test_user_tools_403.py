@@ -1,6 +1,6 @@
 """Unit tests for user management tools 403 error handling."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -57,7 +57,7 @@ class TestUserTools403Handling:
         )
 
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):
-            with patch.object(fleet_client, "get", side_effect=error) as mock_get:
+            with patch.object(fleet_client, "get", side_effect=error):
                 # Get the tool function
                 tools = await mcp_server.list_tools()
                 list_users_tool = next(t for t in tools if t.name == "fleet_list_users")
@@ -95,7 +95,7 @@ class TestUserTools403Handling:
         )
 
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):
-            with patch.object(fleet_client, "get", side_effect=error) as mock_get:
+            with patch.object(fleet_client, "get", side_effect=error):
                 # Get the tool function
                 tools = await mcp_server.list_tools()
                 get_user_tool = next(t for t in tools if t.name == "fleet_get_user")
@@ -134,7 +134,7 @@ class TestUserTools403Handling:
         )
 
         with patch.object(httpx.AsyncClient, "request", return_value=mock_response):
-            with patch.object(fleet_client, "get", side_effect=error) as mock_get:
+            with patch.object(fleet_client, "get", side_effect=error):
                 # Get the tool function
                 tools = await mcp_server.list_tools()
                 list_users_tool = next(t for t in tools if t.name == "fleet_list_users")

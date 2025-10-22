@@ -1,17 +1,12 @@
 """Unit tests for the Fleet schema caching functionality."""
 
 import json
-import time
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from fleet_mcp.tools.table_discovery import (
-    CACHE_DIR,
     FLEET_SCHEMA_URL,
-    SCHEMA_CACHE_FILE,
-    SCHEMA_CACHE_TTL,
     TableSchemaCache,
 )
 

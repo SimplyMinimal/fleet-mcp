@@ -673,9 +673,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 # For MCP, we'll need to send the base64 content as a file.
                 import base64
 
-                # Decode base64 content
+                # Decode base64 content to validate it
                 try:
-                    package_bytes = base64.b64decode(package_content)
+                    base64.b64decode(package_content)
                 except Exception as decode_err:
                     return {
                         "success": False,
@@ -898,7 +898,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     return {
                         "success": True,
                         "installer": installer,
-                        "message": f"Uploaded Apple MDM installer successfully",
+                        "message": "Uploaded Apple MDM installer successfully",
                     }
                 else:
                     return {

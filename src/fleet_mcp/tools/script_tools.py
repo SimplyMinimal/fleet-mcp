@@ -714,7 +714,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     return {
                         "success": True,
                         "batch_execution_id": response.data.get("batch_execution_id"),
-                        "message": f"Batch script execution started",
+                        "message": "Batch script execution started",
                     }
                 else:
                     return {

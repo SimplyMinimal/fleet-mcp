@@ -1,6 +1,6 @@
 """Tests for new Fleet Device/Fleet Desktop tools (Priority 6)."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

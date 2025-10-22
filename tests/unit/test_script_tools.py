@@ -1,8 +1,7 @@
 """Tests for Fleet Script management tools."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-import httpx
 import pytest
 
 from fleet_mcp.client import FleetAPIError, FleetClient, FleetResponse
@@ -57,7 +56,7 @@ class TestScriptToolsRead:
         with patch.object(fleet_client, "get", return_value=mock_response):
             script_tools.register_read_tools(mock_mcp, fleet_client)
             # Get the registered function
-            tool_calls = [call for call in mock_mcp.tool.call_args_list]
+            tool_calls = list(mock_mcp.tool.call_args_list)
             assert len(tool_calls) > 0
 
     @pytest.mark.asyncio

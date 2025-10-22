@@ -195,7 +195,7 @@ def test(ctx: click.Context) -> None:
         click.echo(f"   Testing connection to {config.server_url}...")
 
     except Exception as e:
-        click.echo(f"   Status: Invalid")
+        click.echo("   Status: Invalid")
         click.echo(f"   Error: {e}")
         click.echo()
         click.echo("Configuration validation failed. Please check your configuration.")

@@ -1,8 +1,7 @@
 """Unit tests for improved error handling in user and activity tools."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-import httpx
 import pytest
 from mcp.server.fastmcp import FastMCP
 

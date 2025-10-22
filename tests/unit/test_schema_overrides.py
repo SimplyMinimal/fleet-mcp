@@ -1,14 +1,12 @@
 """Unit tests for Fleet schema override functionality."""
 
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import yaml
 
 from fleet_mcp.tools.table_discovery import (
-    SCHEMA_OVERRIDES_CACHE_FILE,
     TableSchemaCache,
 )
 
@@ -152,7 +150,7 @@ class TestSchemaOverrides:
 
             # Verify file was created and contains correct data
             assert test_cache_file.exists()
-            with open(test_cache_file, "r") as f:
+            with open(test_cache_file) as f:
                 saved_data = json.load(f)
 
             assert "vscode_extensions" in saved_data

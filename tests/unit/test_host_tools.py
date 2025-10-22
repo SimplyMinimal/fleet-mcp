@@ -1,6 +1,6 @@
 """Tests for new Fleet Host management tools (Priority 5B)."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

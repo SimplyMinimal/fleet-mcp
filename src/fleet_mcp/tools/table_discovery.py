@@ -204,7 +204,7 @@ class TableSchemaCache:
         """
         logger.debug(f"Loading schema from cache: {SCHEMA_CACHE_FILE}")
 
-        with open(SCHEMA_CACHE_FILE, "r") as f:
+        with open(SCHEMA_CACHE_FILE) as f:
             schema_json = json.load(f)
 
         # Convert to our internal format
@@ -448,7 +448,7 @@ class TableSchemaCache:
         """
         logger.debug(f"Loading overrides from cache: {SCHEMA_OVERRIDES_CACHE_FILE}")
 
-        with open(SCHEMA_OVERRIDES_CACHE_FILE, "r") as f:
+        with open(SCHEMA_OVERRIDES_CACHE_FILE) as f:
             overrides_json: dict[str, dict[str, Any]] = json.load(f)
 
         return overrides_json

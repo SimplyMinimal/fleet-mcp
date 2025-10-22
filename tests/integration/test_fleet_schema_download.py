@@ -1,12 +1,10 @@
 """Integration tests for downloading and caching the official Fleet schema."""
 
 import json
-from pathlib import Path
 
 import pytest
 
 from fleet_mcp.tools.table_discovery import (
-    FLEET_SCHEMA_URL,
     SCHEMA_CACHE_FILE,
     TableSchemaCache,
     get_table_cache,
@@ -34,7 +32,7 @@ class TestFleetSchemaDownload:
                 assert table in schemas, f"Common table '{table}' should be in schema"
 
             # Verify schema structure
-            for table_name, table_schema in list(schemas.items())[:5]:
+            for _table_name, table_schema in list(schemas.items())[:5]:
                 assert "description" in table_schema
                 assert "platforms" in table_schema
                 assert isinstance(table_schema["platforms"], list)
@@ -77,7 +75,7 @@ class TestFleetSchemaDownload:
             ), f"Cache file should exist at {SCHEMA_CACHE_FILE}"
 
             # Cache file should be valid JSON
-            with open(SCHEMA_CACHE_FILE, "r") as f:
+            with open(SCHEMA_CACHE_FILE) as f:
                 schema_json = json.load(f)
 
             assert len(schema_json) > 0, "Cache file should contain schemas"
@@ -115,7 +113,7 @@ class TestFleetSchemaDownload:
         assert cache1 is cache2, "Should return same cache instance"
         assert len(cache1.fleet_schemas) > 0, "Should have schemas"
 
-        print(f"✓ Global cache singleton working")
+        print("✓ Global cache singleton working")
 
     async def test_cache_info(self):
         """Test cache info retrieval."""
@@ -134,7 +132,7 @@ class TestFleetSchemaDownload:
         assert info["loaded_schemas_count"] > 0
         assert info["cache_ttl_hours"] == 24
 
-        print(f"✓ Cache info:")
+        print("✓ Cache info:")
         print(f"  - Schemas loaded: {info['loaded_schemas_count']}")
         print(f"  - Cache exists: {info['cache_exists']}")
         if info["cache_age_hours"]:

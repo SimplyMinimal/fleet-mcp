@@ -183,7 +183,7 @@ class TestScriptToolsIntegration:
                     await live_fleet_client.delete(
                         f"/api/latest/fleet/scripts/{script_id}"
                     )
-                except:
+                except Exception:
                     pass
             raise
         except Exception as e:
@@ -193,7 +193,7 @@ class TestScriptToolsIntegration:
                     await live_fleet_client.delete(
                         f"/api/latest/fleet/scripts/{script_id}"
                     )
-                except:
+                except Exception:
                     pass
             pytest.skip(f"Create/delete script failed: {e}")
 
@@ -257,7 +257,7 @@ class TestScriptToolsIntegration:
                     await live_fleet_client.delete(
                         f"/api/latest/fleet/scripts/{script_id}"
                     )
-                except:
+                except Exception:
                     pass
             raise
         except Exception as e:
@@ -267,7 +267,7 @@ class TestScriptToolsIntegration:
                     await live_fleet_client.delete(
                         f"/api/latest/fleet/scripts/{script_id}"
                     )
-                except:
+                except Exception:
                     pass
             pytest.skip(f"Modify script failed: {e}")
 

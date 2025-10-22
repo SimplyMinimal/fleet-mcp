@@ -1,8 +1,7 @@
 """Unit tests for the Fleet MCP Server health check functionality."""
 
 import json
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -509,7 +508,6 @@ class TestServerHealthCheck:
 
             # The result is a list of TextContent objects, so we need to parse it
             # Extract the actual result from the response
-            import json
 
             result_str = str(result)
 
