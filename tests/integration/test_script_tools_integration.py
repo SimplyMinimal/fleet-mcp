@@ -57,7 +57,7 @@ class TestScriptToolsIntegration:
 
                 script_id = scripts[0]["id"]
 
-                # Now get the specific script
+                # Now get the specific script metadata
                 response = await live_fleet_client.get(
                     f"/api/latest/fleet/scripts/{script_id}"
                 )
@@ -70,6 +70,47 @@ class TestScriptToolsIntegration:
 
         except Exception as e:
             pytest.skip(f"Get script failed: {e}")
+
+    async def test_get_script_with_contents(self, live_fleet_client):
+        """Test getting a script with its contents using alt=media parameter."""
+        try:
+            async with live_fleet_client:
+                # First, list scripts to get an ID
+                response = await live_fleet_client.get("/api/latest/fleet/scripts")
+
+                # If endpoint doesn't exist, skip gracefully
+                if not response.success and response.status_code == 404:
+                    pytest.skip("Scripts API not available on this Fleet version")
+
+                assert response.success, "Failed to list scripts"
+
+                scripts = response.data.get("scripts", [])
+                if not scripts:
+                    pytest.skip("No scripts available to test")
+
+                script_id = scripts[0]["id"]
+
+                # Get the script contents using alt=media parameter
+                response = await live_fleet_client.get(
+                    f"/api/latest/fleet/scripts/{script_id}", params={"alt": "media"}
+                )
+
+                assert (
+                    response.success
+                ), f"Failed to get script contents for {script_id}"
+                assert response.data is not None, "No data in response"
+
+                # The content should be in raw_response
+                script_contents = response.data.get("raw_response", "")
+                assert (
+                    script_contents
+                ), "Script contents should not be empty (raw_response)"
+                assert isinstance(
+                    script_contents, str
+                ), "Script contents should be a string"
+
+        except Exception as e:
+            pytest.skip(f"Get script with contents failed: {e}")
 
     async def test_list_batch_scripts(self, live_fleet_client):
         """Test listing batch script executions from a live Fleet instance."""

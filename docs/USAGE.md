@@ -1160,7 +1160,7 @@ List all scripts available in Fleet.
 ```
 
 #### `fleet_get_script`
-Get details of a specific script.
+Get details of a specific script including its contents.
 
 **Parameters:**
 - `script_id` (int): ID of the script to retrieve
@@ -1174,7 +1174,8 @@ Get details of a specific script.
     "team_id": null,
     "name": "script_1.sh",
     "created_at": "2023-07-30T13:41:07Z",
-    "updated_at": "2023-07-30T13:41:07Z"
+    "updated_at": "2023-07-30T13:41:07Z",
+    "script_contents": "#!/bin/bash\necho 'Hello World'\n"
   },
   "message": "Retrieved script 1"
 }

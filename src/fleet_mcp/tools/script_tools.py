@@ -223,31 +223,46 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
     @mcp.tool()
     async def fleet_get_script(script_id: int) -> dict[str, Any]:
-        """Get details of a specific script.
+        """Get details of a specific script including its contents.
 
         Args:
             script_id: ID of the script to retrieve
 
         Returns:
-            Dict containing script details.
+            Dict containing script details including script_contents field.
         """
         try:
             async with client:
-                response = await client.get(f"/api/v1/fleet/scripts/{script_id}")
+                # First, get the script metadata
+                metadata_response = await client.get(
+                    f"/api/v1/fleet/scripts/{script_id}"
+                )
 
-                if response.success and response.data:
-                    script = response.data.get("script", response.data)
-                    return {
-                        "success": True,
-                        "script": script,
-                        "message": f"Retrieved script {script_id}",
-                    }
-                else:
+                if not metadata_response.success or not metadata_response.data:
                     return {
                         "success": False,
-                        "message": response.message,
+                        "message": metadata_response.message,
                         "script": None,
                     }
+
+                script = metadata_response.data.get("script", metadata_response.data)
+
+                # Then, get the script contents using alt=media parameter
+                contents_response = await client.get(
+                    f"/api/v1/fleet/scripts/{script_id}", params={"alt": "media"}
+                )
+
+                if contents_response.success and contents_response.data:
+                    # The content is returned as raw text in the response
+                    script_contents = contents_response.data.get("raw_response", "")
+                    # Add script_contents to the script metadata
+                    script["script_contents"] = script_contents
+
+                return {
+                    "success": True,
+                    "script": script,
+                    "message": f"Retrieved script {script_id}",
+                }
 
         except FleetAPIError as e:
             logger.error(f"Failed to get script {script_id}: {e}")

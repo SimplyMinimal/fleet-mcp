@@ -61,8 +61,9 @@ class TestScriptToolsRead:
 
     @pytest.mark.asyncio
     async def test_get_script(self, fleet_client, mock_mcp):
-        """Test getting a specific script."""
-        mock_response = FleetResponse(
+        """Test getting a specific script with contents."""
+        # Mock metadata response
+        mock_metadata_response = FleetResponse(
             success=True,
             data={
                 "script": {
@@ -76,7 +77,20 @@ class TestScriptToolsRead:
             message="Success",
         )
 
-        with patch.object(fleet_client, "get", return_value=mock_response):
+        # Mock contents response (alt=media)
+        mock_contents_response = FleetResponse(
+            success=True,
+            data={"raw_response": "#!/bin/bash\necho 'Hello World'\n"},
+            message="Success",
+        )
+
+        # Mock the get method to return different responses based on params
+        def mock_get(endpoint, params=None):
+            if params and params.get("alt") == "media":
+                return mock_contents_response
+            return mock_metadata_response
+
+        with patch.object(fleet_client, "get", side_effect=mock_get):
             script_tools.register_read_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
 
