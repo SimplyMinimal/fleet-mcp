@@ -358,6 +358,9 @@ class FleetMCPServer:
                     # Get Fleet user information
                     fleet_user = await self._get_fleet_user_info()
 
+                    # Get fleet-mcp version
+                    from fleet_mcp import __version__
+
                     return {
                         "success": response.success,
                         "message": response.message,
@@ -367,6 +370,7 @@ class FleetMCPServer:
                         "server_config": server_config,
                         "fleet_user": fleet_user,
                         "osquery_schema_cache": cache_info,
+                        "fleet_mcp_version": __version__,
                     }
 
             except Exception as e:

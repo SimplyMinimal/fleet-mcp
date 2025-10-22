@@ -521,6 +521,9 @@ class TestServerHealthCheck:
             assert "fleet_user_role" in result_str
             assert "admin@example.com" in result_str
 
+            # Verify fleet_mcp_version is included
+            assert "fleet_mcp_version" in result_str
+
     @pytest.mark.asyncio
     async def test_preload_schema_cache_with_cache(self, mock_config, tmp_path):
         """Test _preload_schema_cache with existing cache."""
