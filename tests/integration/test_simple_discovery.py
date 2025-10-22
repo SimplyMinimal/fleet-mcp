@@ -81,11 +81,19 @@ class TestSimpleDiscovery:
                                 assert "name" in row, "Missing table name"
                                 assert "type" in row, "Missing table type"
                             return  # Test passed
-
-                    last_error = response.message
+                        else:
+                            # Query succeeded but returned 0 rows
+                            # This means osquery_registry table is empty or not populated
+                            last_error = "osquery_registry table returned 0 rows (table may be empty or not populated on this osquery version)"
+                    else:
+                        last_error = response.message
 
                 # If we get here, no hosts returned data
-                pytest.skip(f"No hosts returned registry data. Last error: {last_error}")
+                pytest.skip(
+                    f"osquery_registry table not available or empty on all tested hosts. "
+                    f"This table may not be populated on all osquery versions. "
+                    f"Last error: {last_error}"
+                )
 
         except Exception as e:
             pytest.skip(f"Registry query failed: {e}")

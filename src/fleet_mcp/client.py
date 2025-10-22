@@ -173,7 +173,16 @@ class FleetClient:
             )
 
             # Handle different response status codes
-            if response.status_code == 200 or response.status_code == 202:
+            if response.status_code in (200, 202, 204):
+                # 204 No Content is a success response with no body (e.g., DELETE)
+                if response.status_code == 204:
+                    return FleetResponse(
+                        success=True,
+                        data={},
+                        message="Request successful (no content)",
+                        status_code=response.status_code,
+                    )
+
                 try:
                     data = response.json()
                     message = "Request successful"
