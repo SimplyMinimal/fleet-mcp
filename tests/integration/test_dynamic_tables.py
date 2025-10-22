@@ -117,15 +117,16 @@ class TestDynamicTableDiscovery:
             # Find ANY table that has columns (not just rpm_packages)
             # This makes the test more flexible across different platforms
             table_with_columns = next(
-                (t for t in tables if len(t.get("columns", [])) > 0),
-                None
+                (t for t in tables if len(t.get("columns", [])) > 0), None
             )
 
             if not table_with_columns:
                 pytest.skip("No tables with columns found on this host")
 
             # Should have columns from live discovery
-            assert len(table_with_columns.get("columns", [])) > 0, f"{table_with_columns['name']} has no columns"
+            assert (
+                len(table_with_columns.get("columns", [])) > 0
+            ), f"{table_with_columns['name']} has no columns"
 
             # Should have description from Fleet schema
             assert (

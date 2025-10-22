@@ -150,7 +150,9 @@ class TestSimpleDiscovery:
                 online_hosts = [h for h in hosts if h.get("status") == "online"]
 
                 if not online_hosts:
-                    pytest.skip("No online hosts available for multiple hosts query test")
+                    pytest.skip(
+                        "No online hosts available for multiple hosts query test"
+                    )
 
                 successful_queries = 0
 

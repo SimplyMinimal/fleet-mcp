@@ -417,9 +417,7 @@ class FleetMCPServer:
                     for warning in cache_info["loading_warnings"]:
                         logger.warning(f"Schema cache warning: {warning}")
             else:
-                logger.info(
-                    "Schema cache empty, will populate on first use"
-                )
+                logger.info("Schema cache empty, will populate on first use")
 
             # Log errors if any
             if cache_info.get("loading_errors"):

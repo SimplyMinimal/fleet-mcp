@@ -58,7 +58,9 @@ class TestScriptToolsIntegration:
                 script_id = scripts[0]["id"]
 
                 # Now get the specific script
-                response = await live_fleet_client.get(f"/api/latest/fleet/scripts/{script_id}")
+                response = await live_fleet_client.get(
+                    f"/api/latest/fleet/scripts/{script_id}"
+                )
 
                 assert response.success, f"Failed to get script {script_id}"
                 assert response.data is not None, "No data in response"
@@ -76,13 +78,14 @@ class TestScriptToolsIntegration:
                 # The batch scripts endpoint requires team_id parameter
                 # Try with team_id=0 for "No team" (global scripts)
                 response = await live_fleet_client.get(
-                    "/api/latest/fleet/scripts/batch",
-                    params={"team_id": 0}
+                    "/api/latest/fleet/scripts/batch", params={"team_id": 0}
                 )
 
                 # If endpoint doesn't exist, skip gracefully
                 if not response.success and response.status_code == 404:
-                    pytest.skip("Batch scripts endpoint not available on this Fleet version")
+                    pytest.skip(
+                        "Batch scripts endpoint not available on this Fleet version"
+                    )
 
                 assert (
                     response.success
@@ -92,7 +95,9 @@ class TestScriptToolsIntegration:
                 # Check for batch executions list (can be null or a list)
                 executions = response.data.get("batch_executions")
                 if executions is not None:
-                    assert isinstance(executions, list), "Batch executions should be a list"
+                    assert isinstance(
+                        executions, list
+                    ), "Batch executions should be a list"
 
                     # If there are executions, verify structure
                     if executions:
@@ -104,7 +109,9 @@ class TestScriptToolsIntegration:
 
                 # Verify count field exists
                 assert "count" in response.data, "Missing count field"
-                assert isinstance(response.data["count"], int), "Count should be an integer"
+                assert isinstance(
+                    response.data["count"], int
+                ), "Count should be an integer"
 
         except Exception as e:
             pytest.skip(f"List batch scripts failed: {e}")
@@ -115,12 +122,15 @@ class TestScriptToolsIntegration:
         try:
             async with live_fleet_client:
                 # First check if scripts API is available
-                check_response = await live_fleet_client.get("/api/latest/fleet/scripts")
+                check_response = await live_fleet_client.get(
+                    "/api/latest/fleet/scripts"
+                )
                 if not check_response.success and check_response.status_code == 404:
                     pytest.skip("Scripts API not available on this Fleet version")
 
                 # Create a simple test script with unique name
                 import time
+
                 timestamp = int(time.time())
                 script_content = f"#!/bin/bash\necho 'test script {timestamp}'"
                 files = {"script": (f"test_script_{timestamp}.sh", script_content)}
@@ -136,19 +146,31 @@ class TestScriptToolsIntegration:
                 assert script_id is not None, "No script_id in response"
 
                 # Verify the script was created
-                response = await live_fleet_client.get(f"/api/latest/fleet/scripts/{script_id}")
+                response = await live_fleet_client.get(
+                    f"/api/latest/fleet/scripts/{script_id}"
+                )
                 assert response.success, f"Failed to get created script {script_id}"
 
                 # Delete the script
-                response = await live_fleet_client.delete(f"/api/latest/fleet/scripts/{script_id}")
-                assert response.success, f"Failed to delete script {script_id}: {response.message}"
+                response = await live_fleet_client.delete(
+                    f"/api/latest/fleet/scripts/{script_id}"
+                )
+                assert (
+                    response.success
+                ), f"Failed to delete script {script_id}: {response.message}"
 
                 # Verify deletion - should get 404
                 try:
-                    response = await live_fleet_client.get(f"/api/latest/fleet/scripts/{script_id}")
+                    response = await live_fleet_client.get(
+                        f"/api/latest/fleet/scripts/{script_id}"
+                    )
                     # If we get here without exception, check it's a 404
-                    assert not response.success, "Script should not exist after deletion"
-                    assert response.status_code == 404, "Should get 404 for deleted script"
+                    assert (
+                        not response.success
+                    ), "Script should not exist after deletion"
+                    assert (
+                        response.status_code == 404
+                    ), "Should get 404 for deleted script"
                 except Exception as e:
                     # Getting a 404 exception is also acceptable
                     if "404" not in str(e) and "Not found" not in str(e):
@@ -158,7 +180,9 @@ class TestScriptToolsIntegration:
             # Clean up on assertion failure
             if script_id:
                 try:
-                    await live_fleet_client.delete(f"/api/latest/fleet/scripts/{script_id}")
+                    await live_fleet_client.delete(
+                        f"/api/latest/fleet/scripts/{script_id}"
+                    )
                 except:
                     pass
             raise
@@ -166,7 +190,9 @@ class TestScriptToolsIntegration:
             # Clean up on other exceptions
             if script_id:
                 try:
-                    await live_fleet_client.delete(f"/api/latest/fleet/scripts/{script_id}")
+                    await live_fleet_client.delete(
+                        f"/api/latest/fleet/scripts/{script_id}"
+                    )
                 except:
                     pass
             pytest.skip(f"Create/delete script failed: {e}")
@@ -177,12 +203,15 @@ class TestScriptToolsIntegration:
         try:
             async with live_fleet_client:
                 # First check if scripts API is available
-                check_response = await live_fleet_client.get("/api/latest/fleet/scripts")
+                check_response = await live_fleet_client.get(
+                    "/api/latest/fleet/scripts"
+                )
                 if not check_response.success and check_response.status_code == 404:
                     pytest.skip("Scripts API not available on this Fleet version")
 
                 # Create a test script with unique name
                 import time
+
                 timestamp = int(time.time())
                 script_content = f"#!/bin/bash\necho 'original {timestamp}'"
                 files = {"script": (f"test_modify_{timestamp}.sh", script_content)}
@@ -203,21 +232,31 @@ class TestScriptToolsIntegration:
                     f"/api/latest/fleet/scripts/{script_id}", files=files
                 )
 
-                assert response.success, f"Failed to modify script {script_id}: {response.message}"
+                assert (
+                    response.success
+                ), f"Failed to modify script {script_id}: {response.message}"
 
                 # Verify the script was modified
-                response = await live_fleet_client.get(f"/api/latest/fleet/scripts/{script_id}")
-                assert response.success, f"Failed to get modified script: {response.message}"
+                response = await live_fleet_client.get(
+                    f"/api/latest/fleet/scripts/{script_id}"
+                )
+                assert (
+                    response.success
+                ), f"Failed to get modified script: {response.message}"
 
                 # Clean up
-                response = await live_fleet_client.delete(f"/api/latest/fleet/scripts/{script_id}")
+                response = await live_fleet_client.delete(
+                    f"/api/latest/fleet/scripts/{script_id}"
+                )
                 assert response.success, f"Failed to delete script: {response.message}"
 
         except AssertionError:
             # Clean up on assertion failure
             if script_id:
                 try:
-                    await live_fleet_client.delete(f"/api/latest/fleet/scripts/{script_id}")
+                    await live_fleet_client.delete(
+                        f"/api/latest/fleet/scripts/{script_id}"
+                    )
                 except:
                     pass
             raise
@@ -225,7 +264,9 @@ class TestScriptToolsIntegration:
             # Clean up on other exceptions
             if script_id:
                 try:
-                    await live_fleet_client.delete(f"/api/latest/fleet/scripts/{script_id}")
+                    await live_fleet_client.delete(
+                        f"/api/latest/fleet/scripts/{script_id}"
+                    )
                 except:
                     pass
             pytest.skip(f"Modify script failed: {e}")
@@ -245,7 +286,9 @@ class TestScriptToolsIntegration:
                 host_id = hosts[0]["id"]
 
                 # List scripts for the host using correct endpoint
-                response = await live_fleet_client.get(f"/api/latest/fleet/hosts/{host_id}/scripts")
+                response = await live_fleet_client.get(
+                    f"/api/latest/fleet/hosts/{host_id}/scripts"
+                )
 
                 # If endpoint doesn't exist, skip gracefully
                 if not response.success and response.status_code == 404:
@@ -277,7 +320,7 @@ class TestScriptToolsIntegration:
                 # Try multiple hosts - some may not have scripts enabled
                 num_of_hosts_to_test = online_hosts[:10]
                 last_error = None
-                for host in num_of_hosts_to_test: # Try up to 3 hosts
+                for host in num_of_hosts_to_test:  # Try up to 3 hosts
                     print(f"Trying host {host['hostname']}")
                     host_id = host["id"]
 
@@ -295,17 +338,25 @@ class TestScriptToolsIntegration:
                         # Check if this host supports scripts
                         if response.success:
                             assert response.data is not None, "No data in response"
-                            assert "execution_id" in response.data, "Missing execution_id"
+                            assert (
+                                "execution_id" in response.data
+                            ), "Missing execution_id"
                             return  # Test passed!
                         elif response.status_code == 404:
-                            pytest.skip("Script execution API not available on this Fleet version")
+                            pytest.skip(
+                                "Script execution API not available on this Fleet version"
+                            )
                         else:
                             last_error = response.message
 
                     except Exception as e:
                         # Handle validation errors (422) - scripts disabled on this host
                         error_msg = str(e)
-                        if "422" in error_msg or "Unprocessable Entity" in error_msg or "Scripts are disabled" in error_msg:
+                        if (
+                            "422" in error_msg
+                            or "Unprocessable Entity" in error_msg
+                            or "Scripts are disabled" in error_msg
+                        ):
                             last_error = error_msg
                             continue  # Try next host
                         else:
@@ -322,7 +373,11 @@ class TestScriptToolsIntegration:
         except Exception as e:
             # Only skip for known issues, otherwise let the test fail
             error_msg = str(e)
-            if "Scripts are disabled" in error_msg or "422" in error_msg or "Unprocessable Entity" in error_msg:
+            if (
+                "Scripts are disabled" in error_msg
+                or "422" in error_msg
+                or "Unprocessable Entity" in error_msg
+            ):
                 pytest.skip(
                     f"Scripts are disabled on all tested hosts. "
                     f"To run scripts, deploy fleetd agent with scripts enabled. "

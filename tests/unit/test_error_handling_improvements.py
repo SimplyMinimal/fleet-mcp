@@ -7,7 +7,9 @@ import pytest
 
 from fleet_mcp.client import FleetAPIError, FleetClient, FleetResponse
 from fleet_mcp.config import FleetConfig
-from fleet_mcp.tools.activity_tools import register_read_tools as register_activity_tools
+from fleet_mcp.tools.activity_tools import (
+    register_read_tools as register_activity_tools,
+)
 from fleet_mcp.tools.user_tools import register_read_tools as register_user_tools
 from mcp.server.fastmcp import FastMCP
 
@@ -165,9 +167,7 @@ class TestImprovedErrorHandling:
             list_activities_tool = next(
                 t for t in tools if t.name == "fleet_list_activities"
             )
-            result = await mcp_server.call_tool(
-                list_activities_tool.name, arguments={}
-            )
+            result = await mcp_server.call_tool(list_activities_tool.name, arguments={})
 
             # Verify specific 403 error message
             result_str = str(result)
@@ -191,9 +191,7 @@ class TestImprovedErrorHandling:
             list_activities_tool = next(
                 t for t in tools if t.name == "fleet_list_activities"
             )
-            result = await mcp_server.call_tool(
-                list_activities_tool.name, arguments={}
-            )
+            result = await mcp_server.call_tool(list_activities_tool.name, arguments={})
 
             # Verify failure is reported correctly
             result_str = str(result)
@@ -263,12 +261,9 @@ class TestImprovedErrorHandling:
             list_activities_tool = next(
                 t for t in tools if t.name == "fleet_list_activities"
             )
-            result = await mcp_server.call_tool(
-                list_activities_tool.name, arguments={}
-            )
+            result = await mcp_server.call_tool(list_activities_tool.name, arguments={})
 
             # Verify success is reported correctly
             result_str = str(result)
             assert "success" in result_str.lower()
             assert "true" in result_str.lower() or "retrieved" in result_str.lower()
-
