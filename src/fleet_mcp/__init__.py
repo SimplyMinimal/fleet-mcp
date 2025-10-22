@@ -7,7 +7,6 @@ and monitor security across fleets of computers.
 
 __version__ = "1.0.2"
 __author__ = "SimplyMinimal"
-__email__ = "fleet-mcp@example.com"
 
 from .client import FleetClient
 from .config import FleetConfig
