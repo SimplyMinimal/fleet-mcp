@@ -577,85 +577,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
 
-def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
-    """Register write host management tools with the MCP server.
+def register_query_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register host query tools with the MCP server.
+
+    These are the two query execution tools that run osquery against hosts.
+    In SELECT-only mode, these are replaced by validated versions from query_tools_readonly.
 
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
     """
-
-    @mcp.tool()
-    async def fleet_delete_host(host_id: int) -> dict[str, Any]:
-        """Delete a host from Fleet.
-
-        Note: A deleted host will fail authentication and may attempt to re-enroll
-        if it still has a valid enroll secret.
-
-        Args:
-            host_id: The ID of the host to delete
-
-        Returns:
-            Dict indicating success or failure of the deletion.
-        """
-        try:
-            async with client:
-                response = await client.delete(f"/hosts/{host_id}")
-
-                return {
-                    "success": response.success,
-                    "message": response.message
-                    or f"Host {host_id} deleted successfully",
-                    "host_id": host_id,
-                }
-
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete host {host_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete host: {str(e)}",
-                "host_id": host_id,
-            }
-
-    @mcp.tool()
-    async def fleet_transfer_hosts(team_id: int, host_ids: list[int]) -> dict[str, Any]:
-        """Transfer hosts to a different team.
-
-        Args:
-            team_id: Target team ID (use 0 for "No team")
-            host_ids: List of host IDs to transfer
-
-        Returns:
-            Dict indicating success or failure of the transfer.
-        """
-        try:
-            async with client:
-                # Convert team_id=0 to null for "No team"
-                json_data = {
-                    "team_id": None if team_id == 0 else team_id,
-                    "hosts": host_ids,
-                }
-
-                response = await client.post("/hosts/transfer", json_data=json_data)
-
-                return {
-                    "success": response.success,
-                    "message": response.message
-                    or f"Transferred {len(host_ids)} hosts to team {team_id}",
-                    "team_id": team_id,
-                    "host_ids": host_ids,
-                    "transferred_count": len(host_ids) if response.success else 0,
-                }
-
-        except FleetAPIError as e:
-            logger.error(f"Failed to transfer hosts: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to transfer hosts: {str(e)}",
-                "team_id": team_id,
-                "host_ids": host_ids,
-                "transferred_count": 0,
-            }
 
     @mcp.tool()
     async def fleet_query_host(host_id: int, query: str) -> dict[str, Any]:
@@ -765,6 +696,87 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "query": query,
                 "rows": [],
                 "row_count": 0,
+            }
+
+
+def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
+    """Register write host management tools with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+        client: Fleet API client
+    """
+
+    @mcp.tool()
+    async def fleet_delete_host(host_id: int) -> dict[str, Any]:
+        """Delete a host from Fleet.
+
+        Note: A deleted host will fail authentication and may attempt to re-enroll
+        if it still has a valid enroll secret.
+
+        Args:
+            host_id: The ID of the host to delete
+
+        Returns:
+            Dict indicating success or failure of the deletion.
+        """
+        try:
+            async with client:
+                response = await client.delete(f"/hosts/{host_id}")
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Host {host_id} deleted successfully",
+                    "host_id": host_id,
+                }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to delete host {host_id}: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to delete host: {str(e)}",
+                "host_id": host_id,
+            }
+
+    @mcp.tool()
+    async def fleet_transfer_hosts(team_id: int, host_ids: list[int]) -> dict[str, Any]:
+        """Transfer hosts to a different team.
+
+        Args:
+            team_id: Target team ID (use 0 for "No team")
+            host_ids: List of host IDs to transfer
+
+        Returns:
+            Dict indicating success or failure of the transfer.
+        """
+        try:
+            async with client:
+                # Convert team_id=0 to null for "No team"
+                json_data = {
+                    "team_id": None if team_id == 0 else team_id,
+                    "hosts": host_ids,
+                }
+
+                response = await client.post("/hosts/transfer", json_data=json_data)
+
+                return {
+                    "success": response.success,
+                    "message": response.message
+                    or f"Transferred {len(host_ids)} hosts to team {team_id}",
+                    "team_id": team_id,
+                    "host_ids": host_ids,
+                    "transferred_count": len(host_ids) if response.success else 0,
+                }
+
+        except FleetAPIError as e:
+            logger.error(f"Failed to transfer hosts: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to transfer hosts: {str(e)}",
+                "team_id": team_id,
+                "host_ids": host_ids,
+                "transferred_count": 0,
             }
 
     @mcp.tool()
