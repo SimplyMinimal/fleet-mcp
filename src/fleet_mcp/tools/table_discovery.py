@@ -626,14 +626,10 @@ class TableSchemaCache:
                     "notes": fleet_schema.get("notes"),
                     "is_custom": False,
                     "metadata_source": "fleet_repository",
+                    # Copy columns from Fleet schema
+                    "columns": fleet_schema.get("columns", []),
+                    "column_details": fleet_schema.get("column_details", {}),
                 }
-
-                # Merge column details (prefer Fleet's descriptions)
-                for col_name, col_info in fleet_schema.get(
-                    "column_details", {}
-                ).items():
-                    if col_name in enriched["column_details"]:
-                        enriched["column_details"][col_name].update(col_info)
 
                 # Merge schema overrides
                 enriched = self._merge_overrides_with_schema(name, enriched)

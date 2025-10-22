@@ -50,7 +50,8 @@ class TestSimpleDiscovery:
 
     async def test_osquery_registry_query(self, live_fleet_client):
         """Test querying the osquery registry for available tables."""
-        query = "SELECT name FROM osquery_registry WHERE registry = 'table' ORDER BY name LIMIT 10;"
+        # Query osquery_registry table - columns: name, registry, active, internal, owner_uuid
+        query = "SELECT name, registry FROM osquery_registry WHERE registry = 'table' ORDER BY name LIMIT 10;"
 
         try:
             async with live_fleet_client:
@@ -64,9 +65,9 @@ class TestSimpleDiscovery:
                 if not online_hosts:
                     pytest.skip("No online hosts available for registry query test")
 
-                # Try multiple hosts until one succeeds (some may not respond)
+                # Try all online hosts until one succeeds
                 last_error = None
-                for host in online_hosts[:3]:  # Try up to 3 hosts
+                for host in online_hosts:
                     host_id = host["id"]
 
                     response = await live_fleet_client.post(
@@ -79,19 +80,17 @@ class TestSimpleDiscovery:
                             # Success! Verify structure
                             for row in rows:
                                 assert "name" in row, "Missing table name"
-                                assert "type" in row, "Missing table type"
+                                assert "registry" in row, "Missing registry column"
                             return  # Test passed
                         else:
                             # Query succeeded but returned 0 rows
-                            # This means osquery_registry table is empty or not populated
-                            last_error = "osquery_registry table returned 0 rows (table may be empty or not populated on this osquery version)"
+                            last_error = "osquery_registry table returned 0 rows"
                     else:
                         last_error = response.message
 
                 # If we get here, no hosts returned data
                 pytest.skip(
                     f"osquery_registry table not available or empty on all tested hosts. "
-                    f"This table may not be populated on all osquery versions. "
                     f"Last error: {last_error}"
                 )
 
