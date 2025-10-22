@@ -275,8 +275,10 @@ class TestScriptToolsIntegration:
                     pytest.skip("No online hosts available to test")
 
                 # Try multiple hosts - some may not have scripts enabled
+                num_of_hosts_to_test = online_hosts[:10]
                 last_error = None
-                for host in online_hosts[:3]:  # Try up to 3 hosts
+                for host in num_of_hosts_to_test: # Try up to 3 hosts
+                    print(f"Trying host {host['hostname']}")
                     host_id = host["id"]
 
                     # Run a simple script using correct endpoint
@@ -312,7 +314,7 @@ class TestScriptToolsIntegration:
 
                 # If we get here, no hosts had scripts enabled
                 pytest.skip(
-                    f"Scripts are disabled on all tested hosts. "
+                    f"Scripts are disabled on all tested hosts (Tried {len(num_of_hosts_to_test)} hosts). "
                     f"To run scripts, deploy fleetd agent with scripts enabled. "
                     f"Last error: {last_error}"
                 )
