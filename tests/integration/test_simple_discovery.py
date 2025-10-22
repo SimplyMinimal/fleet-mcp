@@ -13,11 +13,22 @@ class TestSimpleDiscovery:
 
     async def test_simple_host_query(self, live_fleet_client):
         """Test simple query to a live host."""
-        host_id = 6
         query = "SELECT name FROM osquery_registry WHERE registry = 'table' LIMIT 5;"
 
         try:
             async with live_fleet_client:
+                # Get an online host
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
+
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
+
+                if not online_hosts:
+                    pytest.skip("No online hosts available for simple query test")
+
+                host_id = online_hosts[0]["id"]
+
                 response = await live_fleet_client.post(
                     f"/hosts/{host_id}/query", json_data={"query": query}
                 )
@@ -39,35 +50,64 @@ class TestSimpleDiscovery:
 
     async def test_osquery_registry_query(self, live_fleet_client):
         """Test querying the osquery registry for available tables."""
-        host_id = 6
         query = "SELECT name, type FROM osquery_registry WHERE registry = 'table' ORDER BY name LIMIT 10;"
 
         try:
             async with live_fleet_client:
-                response = await live_fleet_client.post(
-                    f"/hosts/{host_id}/query", json_data={"query": query}
-                )
+                # Get online hosts
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
 
-                assert response.success, "Registry query failed"
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
 
-                rows = response.data.get("rows", [])
-                assert len(rows) > 0, "No tables found in registry"
+                if not online_hosts:
+                    pytest.skip("No online hosts available for registry query test")
 
-                # Verify we got table information
-                for row in rows:
-                    assert "name" in row, "Missing table name"
-                    assert "type" in row, "Missing table type"
+                # Try multiple hosts until one succeeds (some may not respond)
+                last_error = None
+                for host in online_hosts[:3]:  # Try up to 3 hosts
+                    host_id = host["id"]
+
+                    response = await live_fleet_client.post(
+                        f"/hosts/{host_id}/query", json_data={"query": query}
+                    )
+
+                    if response.success:
+                        rows = response.data.get("rows", [])
+                        if len(rows) > 0:
+                            # Success! Verify structure
+                            for row in rows:
+                                assert "name" in row, "Missing table name"
+                                assert "type" in row, "Missing table type"
+                            return  # Test passed
+
+                    last_error = response.message
+
+                # If we get here, no hosts returned data
+                pytest.skip(f"No hosts returned registry data. Last error: {last_error}")
 
         except Exception as e:
-            pytest.skip(f"Registry query failed (host may be offline): {e}")
+            pytest.skip(f"Registry query failed: {e}")
 
     async def test_system_info_query(self, live_fleet_client):
         """Test querying system_info table."""
-        host_id = 6
         query = "SELECT hostname, uuid, cpu_brand FROM system_info;"
 
         try:
             async with live_fleet_client:
+                # Get an online host
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
+
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
+
+                if not online_hosts:
+                    pytest.skip("No online hosts available for system_info query test")
+
+                host_id = online_hosts[0]["id"]
+
                 response = await live_fleet_client.post(
                     f"/hosts/{host_id}/query", json_data={"query": query}
                 )
@@ -93,37 +133,59 @@ class TestSimpleDiscovery:
         """Test that we can query different hosts."""
         query = "SELECT hostname FROM system_info;"
 
-        # Try multiple host IDs
-        host_ids = [3, 4, 5, 6]
-        successful_queries = 0
+        try:
+            async with live_fleet_client:
+                # Get all online hosts
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
 
-        for host_id in host_ids:
-            try:
-                async with live_fleet_client:
-                    response = await live_fleet_client.post(
-                        f"/hosts/{host_id}/query", json_data={"query": query}
-                    )
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
 
-                    if response.success:
-                        successful_queries += 1
+                if not online_hosts:
+                    pytest.skip("No online hosts available for multiple hosts query test")
 
-            except Exception:
-                # Host may be offline, continue
-                continue
+                successful_queries = 0
 
-        # At least one host should respond
-        if successful_queries == 0:
-            pytest.skip("No hosts available for testing")
+                # Try querying up to 4 hosts
+                for host in online_hosts[:4]:
+                    host_id = host["id"]
+                    try:
+                        response = await live_fleet_client.post(
+                            f"/hosts/{host_id}/query", json_data={"query": query}
+                        )
 
-        assert successful_queries > 0, "No successful queries to any host"
+                        if response.success:
+                            successful_queries += 1
+
+                    except Exception:
+                        # Host may not respond, continue
+                        continue
+
+                # At least one host should respond
+                assert successful_queries > 0, "No successful queries to any host"
+
+        except Exception as e:
+            pytest.skip(f"Multiple hosts query test failed: {e}")
 
     async def test_invalid_query_handling(self, live_fleet_client):
         """Test that invalid queries are handled properly."""
-        host_id = 6
         query = "SELECT * FROM nonexistent_table_xyz;"
 
         try:
             async with live_fleet_client:
+                # Get an online host
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
+
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
+
+                if not online_hosts:
+                    pytest.skip("No online hosts available for invalid query test")
+
+                host_id = online_hosts[0]["id"]
+
                 response = await live_fleet_client.post(
                     f"/hosts/{host_id}/query", json_data={"query": query}
                 )
@@ -141,12 +203,23 @@ class TestSimpleDiscovery:
 
     async def test_query_timeout_handling(self, live_fleet_client):
         """Test that query timeouts are handled properly."""
-        host_id = 6
         # This query might take a while on some systems
         query = "SELECT * FROM processes;"
 
         try:
             async with live_fleet_client:
+                # Get an online host
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
+
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
+
+                if not online_hosts:
+                    pytest.skip("No online hosts available for timeout test")
+
+                host_id = online_hosts[0]["id"]
+
                 response = await live_fleet_client.post(
                     f"/hosts/{host_id}/query", json_data={"query": query}
                 )

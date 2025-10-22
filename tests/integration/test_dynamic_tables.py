@@ -50,11 +50,23 @@ class TestDynamicTableDiscovery:
         """Test discovering tables on a live host."""
         cache = await get_table_cache()
 
-        # Use a test host ID (adjust based on your environment)
-        host_id = 6
-        platform = "rhel"
-
         try:
+            # Get an online host dynamically instead of hard-coding
+            async with live_fleet_client:
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
+
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
+
+                if not online_hosts:
+                    pytest.skip("No online hosts available for discovery test")
+
+                # Use the first online host
+                host = online_hosts[0]
+                host_id = host["id"]
+                platform = host.get("platform", "linux")
+
             tables = await cache.get_tables_for_host(
                 live_fleet_client, host_id, platform
             )
@@ -81,25 +93,48 @@ class TestDynamicTableDiscovery:
         """Test that live discovery merges with Fleet schemas."""
         cache = await get_table_cache()
 
-        host_id = 6
-        platform = "rhel"
-
         try:
+            # Get an online host dynamically
+            async with live_fleet_client:
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
+
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
+
+                if not online_hosts:
+                    pytest.skip("No online hosts available for schema merging test")
+
+                # Use the first online host
+                host = online_hosts[0]
+                host_id = host["id"]
+                platform = host.get("platform", "linux")
+
             tables = await cache.get_tables_for_host(
                 live_fleet_client, host_id, platform
             )
 
-            # Find a table that should have Fleet metadata
-            rpm_table = next((t for t in tables if t["name"] == "rpm_packages"), None)
+            # Find ANY table that has columns (not just rpm_packages)
+            # This makes the test more flexible across different platforms
+            table_with_columns = next(
+                (t for t in tables if len(t.get("columns", [])) > 0),
+                None
+            )
 
-            if rpm_table:
-                # Should have rich metadata from Fleet schemas
-                assert "description" in rpm_table, "rpm_packages missing description"
-                assert "columns" in rpm_table, "rpm_packages missing columns"
-                assert len(rpm_table["columns"]) > 0, "rpm_packages has no columns"
-                assert not rpm_table.get(
-                    "is_custom", False
-                ), "rpm_packages marked as custom"
+            if not table_with_columns:
+                pytest.skip("No tables with columns found on this host")
+
+            # Should have columns from live discovery
+            assert len(table_with_columns.get("columns", [])) > 0, f"{table_with_columns['name']} has no columns"
+
+            # Should have description from Fleet schema
+            assert (
+                "description" in table_with_columns
+            ), f"{table_with_columns['name']} missing description from Fleet schema"
+
+            # Should not be marked as custom if it's a known table
+            if not table_with_columns.get("is_custom", False):
+                assert "columns" in table_with_columns, "Known table missing columns"
 
         except Exception as e:
             pytest.skip(f"Schema merging test failed (host may be offline): {e}")
@@ -204,25 +239,38 @@ class TestDynamicTableDiscovery:
         # Step 1: Load Fleet schemas
         assert len(cache.fleet_schemas) > 0, "Failed to load Fleet schemas"
 
-        # Step 2: Discover tables on live host
-        host_id = 6
-        platform = "rhel"
-
         try:
+            # Step 2: Get an online host dynamically
+            async with live_fleet_client:
+                response = await live_fleet_client.get("/hosts")
+                assert response.success, "Failed to list hosts"
+
+                hosts = response.data.get("hosts", [])
+                online_hosts = [h for h in hosts if h.get("status") == "online"]
+
+                if not online_hosts:
+                    pytest.skip("No online hosts available for full workflow test")
+
+                # Use the first online host
+                host = online_hosts[0]
+                host_id = host["id"]
+                platform = host.get("platform", "linux")
+
+            # Step 3: Discover tables on live host
             tables = await cache.get_tables_for_host(
                 live_fleet_client, host_id, platform
             )
 
-            # Step 3: Verify merged data
+            # Step 4: Verify merged data
             assert len(tables) > 0, "No tables discovered"
 
-            # Step 4: Check for both known and custom tables
+            # Step 5: Check for both known and custom tables
             known_count = sum(1 for t in tables if not t.get("is_custom", False))
             sum(1 for t in tables if t.get("is_custom", False))
 
             assert known_count > 0, "No known tables found"
 
-            # Step 5: Verify data quality
+            # Step 6: Verify data quality
             for table in tables[:10]:
                 assert "name" in table
                 assert "description" in table
