@@ -50,7 +50,7 @@ class TestSimpleDiscovery:
 
     async def test_osquery_registry_query(self, live_fleet_client):
         """Test querying the osquery registry for available tables."""
-        query = "SELECT name, type FROM osquery_registry WHERE registry = 'table' ORDER BY name LIMIT 10;"
+        query = "SELECT name FROM osquery_registry WHERE registry = 'table' ORDER BY name LIMIT 10;"
 
         try:
             async with live_fleet_client:
