@@ -592,9 +592,11 @@ Find specific software on a host by hostname.
 - Combines host lookup and software search in one convenient tool
 
 #### `fleet_get_vulnerabilities`
-List known vulnerabilities across the fleet.
+List known vulnerabilities across the fleet with advanced filtering capabilities.
 
-**Parameters:**
+This function retrieves vulnerabilities from the Fleet API and applies optional client-side filters to the results. Server-side filters (known_exploit, cve_search, order_key) are applied first, then client-side filters are applied to the returned data.
+
+**Server-Side Parameters:**
 - `page` (int, default: 0): Page number for pagination
 - `per_page` (int, default: 100): Number of vulnerabilities per page
 - `order_key` (str, default: "cve"): Field to order by (cve, created_at, hosts_count)
@@ -602,6 +604,17 @@ List known vulnerabilities across the fleet.
 - `team_id` (int, optional): Filter vulnerabilities by team ID
 - `known_exploit` (bool, optional): Filter to vulnerabilities with known exploits
 - `cve_search` (str, default: ""): Search for specific CVE IDs
+
+**Client-Side Filter Parameters (Fleet Premium):**
+- `cve_published_after` (str, optional): Filter CVEs published after this date (ISO format, e.g., "2023-01-01")
+- `cve_published_before` (str, optional): Filter CVEs published before this date (ISO format, e.g., "2024-01-01")
+- `description_keywords` (str, optional): Filter CVEs whose description contains these keywords (case-insensitive)
+- `min_epss_probability` (float, optional): Filter CVEs with EPSS probability >= this value (0.0-1.0)
+- `max_epss_probability` (float, optional): Filter CVEs with EPSS probability <= this value (0.0-1.0)
+- `min_cvss_score` (float, optional): Filter CVEs with CVSS score >= this value (0.0-10.0)
+- `max_cvss_score` (float, optional): Filter CVEs with CVSS score <= this value (0.0-10.0)
+
+**Note:** Client-side filters require Fleet Premium as they depend on Premium-only fields (cvss_score, epss_probability, cve_published, cve_description). If these fields are not available, the filters will skip vulnerabilities with missing data.
 
 **Returns:**
 ```json
@@ -613,12 +626,40 @@ List known vulnerabilities across the fleet.
       "details_link": "https://nvd.nist.gov/vuln/detail/CVE-2024-1234",
       "hosts_count": 15,
       "created_at": "2024-01-15T10:30:00Z",
-      "known_exploit": true
+      "cvss_score": 9.8,
+      "epss_probability": 0.95,
+      "cisa_known_exploit": true,
+      "cve_published": "2024-01-10T00:00:00Z",
+      "cve_description": "Critical remote code execution vulnerability"
     }
   ],
   "count": 1,
-  "message": "Found 1 vulnerabilities"
+  "total_count": 5,
+  "message": "Found 1 vulnerabilities (4 filtered out by client-side filters)"
 }
+```
+
+**Example Usage:**
+```python
+# Get high-severity vulnerabilities with known exploits published in 2023
+result = await fleet_get_vulnerabilities(
+    known_exploit=True,
+    min_cvss_score=7.0,
+    cve_published_after="2023-01-01",
+    cve_published_before="2024-01-01"
+)
+
+# Get vulnerabilities with high exploit probability
+result = await fleet_get_vulnerabilities(
+    min_epss_probability=0.7,
+    min_cvss_score=8.0
+)
+
+# Search for specific types of vulnerabilities
+result = await fleet_get_vulnerabilities(
+    description_keywords="remote code execution",
+    min_cvss_score=9.0
+)
 ```
 
 #### `fleet_list_software_titles`
@@ -1467,3 +1508,9 @@ readonly = false
 2. **Check specific hosts** - Use `fleet_find_software_on_host` to check software on specific hosts
 3. **Monitor vulnerabilities** - Regularly check `fleet_get_vulnerabilities` for security issues
 4. **Filter by criticality** - Use `known_exploit=true` to prioritize critical vulnerabilities
+5. **Advanced filtering** - Combine multiple filters for precise vulnerability targeting:
+   - Use `min_cvss_score` and `max_cvss_score` to filter by severity
+   - Use `min_epss_probability` to focus on vulnerabilities likely to be exploited
+   - Use `cve_published_after` and `cve_published_before` to find recent vulnerabilities
+   - Use `description_keywords` to search for specific vulnerability types (e.g., "remote code execution")
+6. **Optimize queries** - Server-side filters (`known_exploit`, `cve_search`) are applied first, then client-side filters refine the results

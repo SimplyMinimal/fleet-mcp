@@ -10,6 +10,140 @@ from ..client import FleetAPIError, FleetClient
 logger = logging.getLogger(__name__)
 
 
+def _apply_vulnerability_filters(
+    vulnerabilities: list[dict[str, Any]],
+    cve_published_after: str | None = None,
+    cve_published_before: str | None = None,
+    description_keywords: str | None = None,
+    min_epss_probability: float | None = None,
+    max_epss_probability: float | None = None,
+    min_cvss_score: float | None = None,
+    max_cvss_score: float | None = None,
+) -> list[dict[str, Any]]:
+    """Apply client-side filters to vulnerability data.
+
+    Args:
+        vulnerabilities: List of vulnerability dictionaries from Fleet API
+        cve_published_after: Filter CVEs published after this date (ISO format)
+        cve_published_before: Filter CVEs published before this date (ISO format)
+        description_keywords: Filter CVEs containing these keywords (case-insensitive)
+        min_epss_probability: Filter CVEs with EPSS probability >= this value
+        max_epss_probability: Filter CVEs with EPSS probability <= this value
+        min_cvss_score: Filter CVEs with CVSS score >= this value
+        max_cvss_score: Filter CVEs with CVSS score <= this value
+
+    Returns:
+        Filtered list of vulnerabilities
+    """
+    from datetime import datetime
+
+    filtered = vulnerabilities
+
+    # Filter by CVE published date (after)
+    if cve_published_after is not None:
+        try:
+            # Parse the input date and make it timezone-aware if needed
+            after_date_str = cve_published_after
+            # Add time component if only date is provided
+            if "T" not in after_date_str:
+                after_date_str = after_date_str + "T00:00:00"
+            # Add timezone if not present
+            if (
+                "Z" not in after_date_str
+                and "+" not in after_date_str
+                and "-" not in after_date_str.split("T")[1]
+            ):
+                after_date_str = after_date_str + "Z"
+            after_date = datetime.fromisoformat(after_date_str.replace("Z", "+00:00"))
+
+            filtered = [
+                v
+                for v in filtered
+                if v.get("cve_published") is not None
+                and datetime.fromisoformat(v["cve_published"].replace("Z", "+00:00"))
+                >= after_date
+            ]
+        except (ValueError, AttributeError) as e:
+            logger.warning(
+                f"Invalid cve_published_after date format: {cve_published_after}. Error: {e}"
+            )
+
+    # Filter by CVE published date (before)
+    if cve_published_before is not None:
+        try:
+            # Parse the input date and make it timezone-aware if needed
+            before_date_str = cve_published_before
+            # Add time component if only date is provided (end of day)
+            if "T" not in before_date_str:
+                before_date_str = before_date_str + "T23:59:59"
+            # Add timezone if not present
+            if (
+                "Z" not in before_date_str
+                and "+" not in before_date_str
+                and "-" not in before_date_str.split("T")[1]
+            ):
+                before_date_str = before_date_str + "Z"
+            before_date = datetime.fromisoformat(before_date_str.replace("Z", "+00:00"))
+
+            filtered = [
+                v
+                for v in filtered
+                if v.get("cve_published") is not None
+                and datetime.fromisoformat(v["cve_published"].replace("Z", "+00:00"))
+                <= before_date
+            ]
+        except (ValueError, AttributeError) as e:
+            logger.warning(
+                f"Invalid cve_published_before date format: {cve_published_before}. Error: {e}"
+            )
+
+    # Filter by description keywords
+    if description_keywords is not None and description_keywords.strip():
+        keywords_lower = description_keywords.lower()
+        filtered = [
+            v
+            for v in filtered
+            if v.get("cve_description") is not None
+            and keywords_lower in v["cve_description"].lower()
+        ]
+
+    # Filter by minimum EPSS probability
+    if min_epss_probability is not None:
+        filtered = [
+            v
+            for v in filtered
+            if v.get("epss_probability") is not None
+            and v["epss_probability"] >= min_epss_probability
+        ]
+
+    # Filter by maximum EPSS probability
+    if max_epss_probability is not None:
+        filtered = [
+            v
+            for v in filtered
+            if v.get("epss_probability") is not None
+            and v["epss_probability"] <= max_epss_probability
+        ]
+
+    # Filter by minimum CVSS score
+    if min_cvss_score is not None:
+        filtered = [
+            v
+            for v in filtered
+            if v.get("cvss_score") is not None and v["cvss_score"] >= min_cvss_score
+        ]
+
+    # Filter by maximum CVSS score
+    if max_cvss_score is not None:
+        filtered = [
+            v
+            for v in filtered
+            if v.get("cvss_score") is not None and v["cvss_score"] <= max_cvss_score
+        ]
+
+    return filtered
+
+
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register software and vulnerability management tools with the MCP server.
 
@@ -224,8 +358,20 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         team_id: int | None = None,
         known_exploit: bool | None = None,
         cve_search: str = "",
+        cve_published_after: str | None = None,
+        cve_published_before: str | None = None,
+        description_keywords: str | None = None,
+        min_epss_probability: float | None = None,
+        max_epss_probability: float | None = None,
+        min_cvss_score: float | None = None,
+        max_cvss_score: float | None = None,
     ) -> dict[str, Any]:
         """List known vulnerabilities across the fleet.
+
+        This function retrieves vulnerabilities from the Fleet API and applies
+        optional client-side filters to the results. Server-side filters
+        (known_exploit, cve_search, order_key) are applied first, then
+        client-side filters are applied to the returned data.
 
         Args:
             page: Page number for pagination (0-based)
@@ -233,11 +379,36 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             order_key: Field to order by (cve, created_at, hosts_count)
             order_direction: Sort direction (asc, desc)
             team_id: Filter vulnerabilities by team ID
-            known_exploit: Filter to vulnerabilities with known exploits
-            cve_search: Search for specific CVE IDs
+            known_exploit: Filter to vulnerabilities with known exploits (server-side)
+            cve_search: Search for specific CVE IDs (server-side)
+            cve_published_after: Filter CVEs published after this date (ISO format, e.g., "2023-01-01").
+                Client-side filter. Requires Fleet Premium for cve_published field.
+            cve_published_before: Filter CVEs published before this date (ISO format, e.g., "2024-01-01").
+                Client-side filter. Requires Fleet Premium for cve_published field.
+            description_keywords: Filter CVEs whose description contains these keywords (case-insensitive).
+                Client-side filter. Requires Fleet Premium for cve_description field.
+            min_epss_probability: Filter CVEs with EPSS probability >= this value (0.0-1.0).
+                Client-side filter. Requires Fleet Premium for epss_probability field.
+            max_epss_probability: Filter CVEs with EPSS probability <= this value (0.0-1.0).
+                Client-side filter. Requires Fleet Premium for epss_probability field.
+            min_cvss_score: Filter CVEs with CVSS score >= this value (0.0-10.0).
+                Client-side filter. Requires Fleet Premium for cvss_score field.
+            max_cvss_score: Filter CVEs with CVSS score <= this value (0.0-10.0).
+                Client-side filter. Requires Fleet Premium for cvss_score field.
 
         Returns:
             Dict containing list of vulnerabilities and pagination metadata.
+            The 'count' field reflects the number of vulnerabilities after client-side filtering.
+            The 'total_count' field reflects the total count from the API before filtering.
+
+        Example:
+            # Get high-severity vulnerabilities with known exploits published in 2023
+            result = await fleet_get_vulnerabilities(
+                known_exploit=True,
+                min_cvss_score=7.0,
+                cve_published_after="2023-01-01",
+                cve_published_before="2024-01-01"
+            )
         """
         try:
             async with client:
@@ -259,14 +430,33 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 if response.success and response.data:
                     vulnerabilities = response.data.get("vulnerabilities", [])
+                    original_count = len(vulnerabilities)
+
+                    # Apply client-side filters
+                    filtered_vulnerabilities = _apply_vulnerability_filters(
+                        vulnerabilities,
+                        cve_published_after=cve_published_after,
+                        cve_published_before=cve_published_before,
+                        description_keywords=description_keywords,
+                        min_epss_probability=min_epss_probability,
+                        max_epss_probability=max_epss_probability,
+                        min_cvss_score=min_cvss_score,
+                        max_cvss_score=max_cvss_score,
+                    )
+
+                    filtered_count = len(filtered_vulnerabilities)
+                    filter_message = ""
+                    if filtered_count < original_count:
+                        filter_message = f" ({original_count - filtered_count} filtered out by client-side filters)"
+
                     return {
                         "success": True,
-                        "vulnerabilities": vulnerabilities,
-                        "count": len(vulnerabilities),
-                        "total_count": response.data.get("count", len(vulnerabilities)),
+                        "vulnerabilities": filtered_vulnerabilities,
+                        "count": filtered_count,
+                        "total_count": response.data.get("count", original_count),
                         "page": page,
                         "per_page": per_page,
-                        "message": f"Found {len(vulnerabilities)} vulnerabilities",
+                        "message": f"Found {filtered_count} vulnerabilities{filter_message}",
                     }
                 else:
                     return {
