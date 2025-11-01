@@ -253,7 +253,12 @@ Run an ad-hoc live query against a host identified by UUID, hostname, or serial 
 - **Full Write Access** (`readonly=false`): All queries allowed without validation
 
 **Parameters:**
-- `identifier` (str): Host UUID, hostname, or hardware serial number
+- `identifier` (str): Host identifier - supports multiple formats:
+  - Host UUID (e.g., `392547dc-0000-0000-a87a-d701ff75bc65`)
+  - Hostname/computer name (e.g., `my-laptop.local`)
+  - Hardware serial number (e.g., `C02ABC123DEF`)
+  - osquery host ID
+  - Node key
 - `query` (str): SQL query string to execute (SELECT-only in read-only mode)
 
 **Returns:**
@@ -261,6 +266,8 @@ Run an ad-hoc live query against a host identified by UUID, hostname, or serial 
 {
   "success": true,
   "identifier": "my-laptop",
+  "host_id": 123,
+  "hostname": "my-laptop.local",
   "query": "SELECT * FROM system_info;",
   "status": "online",
   "error": null,
@@ -271,13 +278,16 @@ Run an ad-hoc live query against a host identified by UUID, hostname, or serial 
       "physical_memory": "17179869184"
     }
   ],
-  "row_count": 1
+  "row_count": 1,
+  "message": "Query executed on my-laptop.local, returned 1 rows"
 }
 ```
 
 **Notes:**
-- Convenient when you know the hostname but not the host ID
+- Convenient when you know the hostname/serial but not the host ID
+- Automatically resolves the identifier to the host ID before executing the query
 - Same timeout and validation rules as `fleet_query_host`
+- Returns both the original identifier and the resolved host information
 
 ### Query Management Tools
 

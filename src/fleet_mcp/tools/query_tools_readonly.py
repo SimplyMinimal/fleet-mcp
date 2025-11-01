@@ -266,13 +266,19 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
         The query will timeout if the host doesn't respond within the configured
         FLEET_LIVE_QUERY_REST_PERIOD (default 25 seconds).
 
+        The tool automatically handles partial hostname matching - if you provide
+        a short hostname like 'host-abc123', it will find the full hostname
+        'host-abc123.example.com' automatically.
+
         Args:
-            identifier: Host UUID, hostname, or hardware serial number
+            identifier: Host UUID, hostname (full or partial), or hardware serial number
             query: SQL SELECT query string to execute
 
         Returns:
             Dict containing query results from the host.
         """
+        from ..utils import resolve_host_identifier
+
         # Validate query is SELECT-only
         is_valid, error_msg = validate_select_query(query)
         if not is_valid:
@@ -287,23 +293,22 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         try:
             async with client:
-                # First get the host to find its ID
-                response = await client.get(f"/hosts/identifier/{identifier}")
+                # Resolve the identifier to a host
+                result = await resolve_host_identifier(client, identifier)
 
-                if not response.success or not response.data:
+                if not result.success:
                     return {
                         "success": False,
-                        "message": f"Host not found: {identifier}",
+                        "message": result.error_message
+                        or f"Host not found: {identifier}",
                         "identifier": identifier,
                         "query": query,
                         "rows": [],
                         "row_count": 0,
                     }
 
-                host = response.data.get("host", {})
-                host_id = host.get("id")
-
                 # Now run the query
+                host_id = result.host_id
                 query_response = await client.post(
                     f"/hosts/{host_id}/query", json_data={"query": query}
                 )
@@ -314,11 +319,11 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                         "success": True,
                         "identifier": identifier,
                         "host_id": host_id,
-                        "hostname": host.get("hostname", ""),
+                        "hostname": result.hostname,
                         "query": query,
                         "rows": rows,
                         "row_count": len(rows),
-                        "message": f"Query executed successfully on {host.get('hostname', identifier)}, returned {len(rows)} rows (SELECT-only validated)",
+                        "message": f"Query executed successfully on {result.hostname}, returned {len(rows)} rows (SELECT-only validated)",
                     }
                 else:
                     return {

@@ -197,28 +197,39 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     async def fleet_get_host_by_identifier(identifier: str) -> dict[str, Any]:
         """Get host by hostname, UUID, or hardware serial number.
 
+        The tool automatically handles partial hostname matching - if you provide
+        a short hostname like 'host-abc123', it will find the full hostname
+        'host-abc123.example.com' automatically.
+
         Args:
             identifier: Host identifier (hostname, UUID, or hardware serial)
 
         Returns:
             Dict containing host information if found.
         """
+        from ..utils import resolve_host_identifier
+
         try:
             async with client:
-                response = await client.get(f"/hosts/identifier/{identifier}")
+                result = await resolve_host_identifier(client, identifier)
 
-                if response.success and response.data:
-                    host = response.data.get("host", {})
+                if result.success:
+                    message = (
+                        f"Found host with identifier '{identifier}' (matched to {result.matched_hostname})"
+                        if result.matched_hostname
+                        else f"Found host with identifier '{identifier}'"
+                    )
                     return {
                         "success": True,
-                        "host": host,
+                        "host": result.host,
                         "identifier": identifier,
-                        "message": f"Found host with identifier '{identifier}'",
+                        "message": message,
                     }
                 else:
                     return {
                         "success": False,
-                        "message": response.message,
+                        "message": result.error_message
+                        or f"Host not found: {identifier}",
                         "host": None,
                         "identifier": identifier,
                     }
@@ -652,36 +663,61 @@ def register_query_tools(mcp: FastMCP, client: FleetClient) -> None:
         The query will timeout if the host doesn't respond within the configured
         FLEET_LIVE_QUERY_REST_PERIOD (default 25 seconds).
 
+        The tool automatically handles partial hostname matching - if you provide
+        a short hostname like 'host-abc123', it will find the full hostname
+        'host-abc123.example.com' automatically.
+
         Args:
-            identifier: Host UUID, hostname, or hardware serial number
+            identifier: Host UUID, hostname (full or partial), or hardware serial number
             query: SQL query string to execute
 
         Returns:
             Dict containing query results from the host.
         """
+        from ..utils import resolve_host_identifier
+
         try:
             async with client:
-                json_data = {"query": query}
-                response = await client.post(
-                    f"/hosts/identifier/{identifier}/query", json_data=json_data
+                # Resolve the identifier to a host
+                result = await resolve_host_identifier(client, identifier)
+
+                if not result.success:
+                    return {
+                        "success": False,
+                        "message": result.error_message
+                        or f"Host not found: {identifier}",
+                        "identifier": identifier,
+                        "query": query,
+                        "rows": [],
+                        "row_count": 0,
+                    }
+
+                # Now run the query
+                host_id = result.host_id
+                query_response = await client.post(
+                    f"/hosts/{host_id}/query", json_data={"query": query}
                 )
 
-                if response.success and response.data:
+                if query_response.success and query_response.data:
+                    rows = query_response.data.get("rows", [])
                     return {
                         "success": True,
                         "identifier": identifier,
+                        "host_id": host_id,
+                        "hostname": result.hostname,
                         "query": query,
-                        "status": response.data.get("status"),
-                        "error": response.data.get("error"),
-                        "rows": response.data.get("rows", []),
-                        "row_count": len(response.data.get("rows", [])),
-                        "message": f"Query executed on host {identifier}",
+                        "status": query_response.data.get("status"),
+                        "error": query_response.data.get("error"),
+                        "rows": rows,
+                        "row_count": len(rows),
+                        "message": f"Query executed on {result.hostname}, returned {len(rows)} rows",
                     }
                 else:
                     return {
                         "success": False,
-                        "message": response.message,
+                        "message": query_response.message,
                         "identifier": identifier,
+                        "host_id": host_id,
                         "query": query,
                         "rows": [],
                         "row_count": 0,

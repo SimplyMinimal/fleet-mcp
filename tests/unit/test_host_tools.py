@@ -3,6 +3,8 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from mcp.server.fastmcp import FastMCP
+from tests.fixtures import TEST_ENCRYPTION_KEYS, get_test_host
 
 from fleet_mcp.client import FleetAPIError, FleetClient, FleetResponse
 from fleet_mcp.config import FleetConfig
@@ -29,6 +31,12 @@ def mock_mcp():
     mcp = MagicMock()
     mcp.tool = MagicMock(return_value=lambda f: f)
     return mcp
+
+
+@pytest.fixture
+def mcp_server():
+    """Create a FastMCP server instance for testing tool invocation."""
+    return FastMCP("test-server")
 
 
 class TestFleetGetHostMacadmins:
@@ -135,12 +143,13 @@ class TestFleetGetHostEncryptionKey:
     @pytest.mark.asyncio
     async def test_success(self, fleet_client, mock_mcp):
         """Test successful retrieval of encryption key."""
+        test_host = get_test_host("laptop")
         mock_response = FleetResponse(
             success=True,
             data={
-                "host_id": 123,
+                "host_id": test_host["id"],
                 "encryption_key": {
-                    "key": "ABC123-DEF456-GHI789",
+                    "key": TEST_ENCRYPTION_KEYS["valid"],
                     "updated_at": "2024-01-15T10:30:00Z",
                 },
             },
@@ -154,9 +163,10 @@ class TestFleetGetHostEncryptionKey:
     @pytest.mark.asyncio
     async def test_no_encryption_key(self, fleet_client, mock_mcp):
         """Test handling when no encryption key is available."""
+        test_host = get_test_host("laptop")
         mock_response = FleetResponse(
             success=True,
-            data={"host_id": 123, "encryption_key": None},
+            data={"host_id": test_host["id"], "encryption_key": None},
             message="No encryption key available",
         )
 
@@ -226,3 +236,415 @@ class TestFleetRefetchHost:
         ):
             host_tools.register_write_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
+
+
+class TestFleetQueryHostByIdentifier:
+    """Test fleet_query_host_by_identifier tool."""
+
+    @pytest.mark.asyncio
+    async def test_success_with_hostname(self, mcp_server, fleet_client):
+        """Test successful query using hostname identifier.
+
+        This test validates that the tool correctly:
+        1. Calls GET /hosts/identifier/{hostname} to resolve the hostname
+        2. Calls POST /hosts/{host_id}/query with the resolved host ID
+        3. Returns the expected result structure
+        """
+        # The identifier we're testing
+        test_host = get_test_host("laptop")
+        hostname = test_host["hostname"]
+        test_query = "SELECT name, pid FROM processes LIMIT 5;"
+
+        # Mock the host lookup response
+        mock_host_response = FleetResponse(
+            success=True,
+            data={
+                "host": {
+                    "id": test_host["id"],
+                    "hostname": test_host["hostname"],
+                    "uuid": test_host["uuid"],
+                    "hardware_serial": test_host["hardware_serial"],
+                }
+            },
+            message="Success",
+        )
+
+        # Mock the query response
+        mock_query_response = FleetResponse(
+            success=True,
+            data={
+                "host_id": 123,
+                "query": test_query,
+                "status": "online",
+                "error": None,
+                "rows": [
+                    {"name": "systemd", "pid": "1"},
+                    {"name": "bash", "pid": "1234"},
+                ],
+            },
+            message="Success",
+        )
+
+        with (
+            patch.object(
+                fleet_client, "get", return_value=mock_host_response
+            ) as mock_get,
+            patch.object(
+                fleet_client, "post", return_value=mock_query_response
+            ) as mock_post,
+        ):
+            # Register the query tools (where fleet_query_host_by_identifier is defined)
+            host_tools.register_query_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            query_tool = next(
+                t for t in tools if t.name == "fleet_query_host_by_identifier"
+            )
+
+            # Actually call the tool with the hostname
+            result = await mcp_server.call_tool(
+                query_tool.name, arguments={"identifier": hostname, "query": test_query}
+            )
+
+            # Verify the API was called with the correct identifier
+            mock_get.assert_called_once_with(f"/hosts/identifier/{hostname}")
+
+            # Verify the query was posted to the correct host ID
+            mock_post.assert_called_once_with(
+                "/hosts/123/query", json_data={"query": test_query}
+            )
+
+            # Verify the result structure
+            result_list = result if isinstance(result, list) else [result]
+            result_str = str(result_list[0])
+            assert "success" in result_str.lower()
+            assert hostname in result_str
+            assert "123" in result_str  # host_id
+
+    @pytest.mark.asyncio
+    async def test_success_with_serial_number(self, mcp_server, fleet_client):
+        """Test successful query using hardware serial number identifier.
+
+        This test validates that the tool correctly:
+        1. Calls GET /hosts/identifier/{serial} to resolve the serial number
+        2. Calls POST /hosts/{host_id}/query with the resolved host ID
+        3. Returns the expected result structure
+        """
+        # The identifier we're testing
+        test_host = get_test_host("workstation")
+        serial_number = test_host["hardware_serial"]
+        test_query = "SELECT * FROM system_info;"
+
+        # Mock the host lookup response
+        mock_host_response = FleetResponse(
+            success=True,
+            data={
+                "host": {
+                    "id": test_host["id"],
+                    "hostname": test_host["hostname"],
+                    "uuid": test_host["uuid"],
+                    "hardware_serial": test_host["hardware_serial"],
+                }
+            },
+            message="Success",
+        )
+
+        # Mock the query response
+        mock_query_response = FleetResponse(
+            success=True,
+            data={
+                "host_id": test_host["id"],
+                "query": test_query,
+                "status": "online",
+                "error": None,
+                "rows": [
+                    {"hostname": test_host["hostname"], "cpu_brand": "Test CPU Brand"}
+                ],
+            },
+            message="Success",
+        )
+
+        with (
+            patch.object(
+                fleet_client, "get", return_value=mock_host_response
+            ) as mock_get,
+            patch.object(
+                fleet_client, "post", return_value=mock_query_response
+            ) as mock_post,
+        ):
+            # Register the query tools (where fleet_query_host_by_identifier is defined)
+            host_tools.register_query_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            query_tool = next(
+                t for t in tools if t.name == "fleet_query_host_by_identifier"
+            )
+
+            # Actually call the tool with the serial number
+            result = await mcp_server.call_tool(
+                query_tool.name,
+                arguments={"identifier": serial_number, "query": test_query},
+            )
+
+            # Verify the API was called with the correct identifier
+            mock_get.assert_called_once_with(f"/hosts/identifier/{serial_number}")
+
+            # Verify the query was posted to the correct host ID
+            mock_post.assert_called_once_with(
+                "/hosts/456/query", json_data={"query": test_query}
+            )
+
+            # Verify the result structure
+            result_list = result if isinstance(result, list) else [result]
+            result_str = str(result_list[0])
+            assert "success" in result_str.lower()
+            assert "456" in result_str  # host_id
+
+    @pytest.mark.asyncio
+    async def test_success_with_uuid(self, mcp_server, fleet_client):
+        """Test successful query using UUID identifier.
+
+        This test validates that the tool correctly:
+        1. Calls GET /hosts/identifier/{uuid} to resolve the UUID
+        2. Calls POST /hosts/{host_id}/query with the resolved host ID
+        3. Returns the expected result structure
+        """
+        # The identifier we're testing
+        test_host = get_test_host("server")
+        uuid = test_host["uuid"]
+        test_query = "SELECT * FROM os_version;"
+
+        # Mock the host lookup response
+        mock_host_response = FleetResponse(
+            success=True,
+            data={
+                "host": {
+                    "id": test_host["id"],
+                    "hostname": test_host["hostname"],
+                    "uuid": test_host["uuid"],
+                    "hardware_serial": test_host[
+                        "hardware_serial"
+                    ],  # Empty serial (common for VMs)
+                }
+            },
+            message="Success",
+        )
+
+        # Mock the query response
+        mock_query_response = FleetResponse(
+            success=True,
+            data={
+                "host_id": test_host["id"],
+                "query": test_query,
+                "status": "online",
+                "error": None,
+                "rows": [
+                    {
+                        "name": "Test OS",
+                        "version": "1.0.0",
+                        "platform": "test",
+                    }
+                ],
+            },
+            message="Success",
+        )
+
+        with (
+            patch.object(
+                fleet_client, "get", return_value=mock_host_response
+            ) as mock_get,
+            patch.object(
+                fleet_client, "post", return_value=mock_query_response
+            ) as mock_post,
+        ):
+            # Register the query tools (where fleet_query_host_by_identifier is defined)
+            host_tools.register_query_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            query_tool = next(
+                t for t in tools if t.name == "fleet_query_host_by_identifier"
+            )
+
+            # Actually call the tool with the UUID
+            result = await mcp_server.call_tool(
+                query_tool.name, arguments={"identifier": uuid, "query": test_query}
+            )
+
+            # Verify the API was called with the correct identifier
+            mock_get.assert_called_once_with(f"/hosts/identifier/{uuid}")
+
+            # Verify the query was posted to the correct host ID
+            mock_post.assert_called_once_with(
+                "/hosts/789/query", json_data={"query": test_query}
+            )
+
+            # Verify the result structure
+            result_list = result if isinstance(result, list) else [result]
+            result_str = str(result_list[0])
+            assert "success" in result_str.lower()
+            assert "789" in result_str  # host_id
+
+    @pytest.mark.asyncio
+    async def test_host_not_found(self, mcp_server, fleet_client):
+        """Test handling when host identifier is not found.
+
+        This test validates that the tool correctly handles the case where
+        the Fleet API returns a failure when looking up a host by identifier,
+        and then tries fuzzy matching by listing all hosts.
+        """
+        unknown_identifier = "unknown-host-12345"
+        test_query = "SELECT * FROM system_info;"
+
+        # Mock response for the identifier lookup (not found)
+        mock_identifier_response = FleetResponse(
+            success=False, data=None, message="Host not found"
+        )
+
+        # Mock response for listing hosts (empty list)
+        mock_hosts_response = FleetResponse(
+            success=True, data={"hosts": []}, message="Success"
+        )
+
+        # Set up side_effect to return different responses for different calls
+        def get_side_effect(endpoint, **kwargs):
+            if endpoint.startswith("/hosts/identifier/"):
+                return mock_identifier_response
+            elif endpoint == "/hosts":
+                return mock_hosts_response
+            return FleetResponse(success=False, data=None, message="Unknown endpoint")
+
+        with patch.object(fleet_client, "get", side_effect=get_side_effect) as mock_get:
+            # Register the query tools (where fleet_query_host_by_identifier is defined)
+            host_tools.register_query_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            query_tool = next(
+                t for t in tools if t.name == "fleet_query_host_by_identifier"
+            )
+
+            # Actually call the tool with an unknown identifier
+            result = await mcp_server.call_tool(
+                query_tool.name,
+                arguments={"identifier": unknown_identifier, "query": test_query},
+            )
+
+            # Verify the API was called twice (identifier lookup + hosts list)
+            assert mock_get.call_count == 2
+            mock_get.assert_any_call(f"/hosts/identifier/{unknown_identifier}")
+            mock_get.assert_any_call("/hosts")
+
+            # Verify the result indicates failure
+            result_list = result if isinstance(result, list) else [result]
+            result_str = str(result_list[0])
+            assert "success" in result_str.lower()
+            assert "false" in result_str.lower()
+            assert "not found" in result_str.lower()
+
+    @pytest.mark.asyncio
+    async def test_query_fails_after_host_lookup(self, mcp_server, fleet_client):
+        """Test handling when host is found but query fails.
+
+        This test validates that the tool correctly handles the case where
+        the host lookup succeeds but the query execution fails.
+        """
+        hostname = "test-host"
+        test_query = "SELECT * FROM invalid_table;"
+
+        # Mock successful host lookup
+        mock_host_response = FleetResponse(
+            success=True,
+            data={
+                "host": {
+                    "id": 123,
+                    "hostname": hostname,
+                    "uuid": "abc-123",
+                }
+            },
+            message="Success",
+        )
+
+        # Mock failed query
+        mock_query_response = FleetResponse(
+            success=False, data=None, message="Query execution failed"
+        )
+
+        with (
+            patch.object(
+                fleet_client, "get", return_value=mock_host_response
+            ) as mock_get,
+            patch.object(
+                fleet_client, "post", return_value=mock_query_response
+            ) as mock_post,
+        ):
+            # Register the query tools (where fleet_query_host_by_identifier is defined)
+            host_tools.register_query_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            query_tool = next(
+                t for t in tools if t.name == "fleet_query_host_by_identifier"
+            )
+
+            # Actually call the tool
+            result = await mcp_server.call_tool(
+                query_tool.name, arguments={"identifier": hostname, "query": test_query}
+            )
+
+            # Verify both API calls were made
+            mock_get.assert_called_once_with(f"/hosts/identifier/{hostname}")
+            mock_post.assert_called_once_with(
+                "/hosts/123/query", json_data={"query": test_query}
+            )
+
+            # Verify the result indicates failure
+            result_list = result if isinstance(result, list) else [result]
+            result_str = str(result_list[0])
+            assert "success" in result_str.lower()
+            assert "false" in result_str.lower()
+
+    @pytest.mark.asyncio
+    async def test_api_error(self, mcp_server, fleet_client):
+        """Test handling of API errors during host lookup.
+
+        This test validates that the tool correctly handles FleetAPIError
+        exceptions raised during the host lookup phase. The tool will try
+        the identifier lookup first, then try to list hosts for fuzzy matching,
+        both of which will fail with the same error.
+        """
+        hostname = "error-host"
+        test_query = "SELECT * FROM system_info;"
+
+        with patch.object(
+            fleet_client,
+            "get",
+            side_effect=FleetAPIError("API error occurred"),
+        ) as mock_get:
+            # Register the query tools (where fleet_query_host_by_identifier is defined)
+            host_tools.register_query_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            query_tool = next(
+                t for t in tools if t.name == "fleet_query_host_by_identifier"
+            )
+
+            # Actually call the tool
+            result = await mcp_server.call_tool(
+                query_tool.name, arguments={"identifier": hostname, "query": test_query}
+            )
+
+            # Verify the API was called twice (identifier lookup + hosts list attempt)
+            assert mock_get.call_count == 2
+            mock_get.assert_any_call(f"/hosts/identifier/{hostname}")
+            mock_get.assert_any_call("/hosts")
+
+            # Verify the result indicates failure
+            result_list = result if isinstance(result, list) else [result]
+            result_str = str(result_list[0])
+            assert "success" in result_str.lower()
+            assert "false" in result_str.lower()
+            assert "failed" in result_str.lower() or "error" in result_str.lower()
