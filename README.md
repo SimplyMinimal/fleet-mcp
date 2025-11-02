@@ -36,7 +36,7 @@ Just want to dive right in? This will set up fleet-mcp with read-only access and
 See the [Available Tools](#available-tools) section below for a complete list of tools.
 
 ---
-<!-- 
+<!--
 <details>
 <summary><b>Local Installation</b></summary>
 
@@ -102,8 +102,8 @@ Before configuring any MCP client, ensure you have:
    pip install fleet-mcp
    ```
 
-2. **Fleet API Token**: Generate an API token from your Fleet instance:  
-   Option 1) 
+2. **Fleet API Token**: Generate an API token from your Fleet instance:
+   Option 1)
    - Log into Fleet UI
    - Navigate to: My account → Get API token
    - Copy the token for use in configuration
@@ -571,7 +571,7 @@ These tools can modify Fleet state and are only available when `readonly=false` 
 #### Query Management
 - `fleet_create_query` - Create a new saved query
 - `fleet_delete_query` - Delete a saved query
-- `fleet_run_live_query` - Execute a live query against specified hosts
+- `fleet_run_live_query_with_results` - Execute a live query and collect results
 - `fleet_run_saved_query` - Run a saved query against hosts
 
 #### Policy Management

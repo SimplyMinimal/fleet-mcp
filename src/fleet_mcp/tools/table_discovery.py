@@ -237,7 +237,7 @@ class TableSchemaCache:
             logger.warning(f"Failed to save schema cache: {e}")
 
     def _parse_fleet_json_schema(
-        self, schema_json: dict | list
+        self, schema_json: dict[str, Any] | list[Any]
     ) -> dict[str, dict[str, Any]]:
         """Parse Fleet's official JSON schema format into our internal format.
 

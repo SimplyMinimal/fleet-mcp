@@ -35,8 +35,8 @@ Fleet MCP provides a set of tools for managing and monitoring your Fleet DM inst
    - `fleet_suggest_tables_for_query`
    - `fleet_get_osquery_table_schema`
    - `fleet_list_osquery_tables`
-6. **Run queries with `fleet_query_host`** for immediate results
-7. **Use `fleet_run_live_query`** for multi-host queries
+6. **Run queries with `fleet_query_host`** for immediate results from one host
+7. **Use `fleet_run_live_query_with_results`** for multi-host queries with results
 8. **Explore other tools** for managing policies, software, and more
 
 ## Quick Reference
@@ -52,7 +52,7 @@ Fleet MCP provides a set of tools for managing and monitoring your Fleet DM inst
 **Query Execution (requires `allow_select_queries=true` or `readonly=false`):**
 - `fleet_query_host` - Run query on a specific host (immediate results)
 - `fleet_query_host_by_identifier` - Run query by hostname/UUID (immediate results)
-- `fleet_run_live_query` - Run query across multiple hosts (async campaign)
+- `fleet_run_live_query_with_results` - Run live query across multiple hosts and collect results via WebSocket
 - `fleet_get_query_report` - Get results from scheduled queries
 
 **Software & Vulnerabilities:**
@@ -344,38 +344,131 @@ fleet_create_query(
 )
 ```
 
-#### `fleet_run_live_query`
-Execute a live query against specified hosts.
+#### `fleet_run_live_query_with_results`
+Execute a live query campaign and collect results in real-time via WebSocket.
 
 **Availability:**
 - **Read-Only Mode with SELECT Queries** (`readonly=true`, `allow_select_queries=true`): Only SELECT queries allowed, validated before execution
 - **Full Write Access** (`readonly=false`): All queries allowed without validation
 
+**Overview:**
+This tool runs a live query campaign across multiple hosts and **collects and returns query results** via WebSocket. It creates a campaign, connects to Fleet's WebSocket API, and streams results back as they arrive with real-time progress notifications.
+
 **Parameters:**
 - `query` (str): SQL query string to execute (SELECT-only in read-only mode)
-- `host_ids` (List[int], optional): List of specific host IDs to target
-- `label_ids` (List[int], optional): List of label IDs to target hosts
-- `team_ids` (List[int], optional): List of team IDs to target hosts
+- `host_ids` (List[int], optional*): List of specific host IDs to target
+- `label_ids` (List[int], optional*): List of label IDs to target hosts
+- `team_ids` (List[int], optional*): List of team IDs to target hosts
+- `target_all_online_hosts` (bool, optional*): If True, automatically fetches and targets all online hosts
+- `timeout` (float, default: 60.0): Maximum time in seconds to wait for results
+
+*At least ONE targeting parameter must be provided.
 
 **Returns:**
 ```json
 {
   "success": true,
   "campaign_id": 123,
-  "query": "SELECT * FROM system_info;",
-  "targets": {
-    "hosts": [1, 2, 3],
-    "labels": [],
-    "teams": []
-  },
-  "message": "Live query campaign 123 started"
+  "results": [
+    {
+      "host_id": 1,
+      "hostname": "host1.example.com",
+      "rows": [{"column1": "value1", "column2": "value2"}],
+      "error": null
+    },
+    {
+      "host_id": 2,
+      "hostname": "host2.example.com",
+      "rows": [{"column1": "value3", "column2": "value4"}],
+      "error": null
+    }
+  ],
+  "total_hosts_targeted": 150,
+  "total_results_received": 127,
+  "execution_time_seconds": 28.4,
+  "message": "Campaign completed. Received 127 results from 150 targeted hosts in 28.4s"
 }
 ```
 
+**Progress Notifications:**
+As the query executes, you'll receive real-time progress updates:
+```
+Creating live query campaign...
+Targeting 150 online hosts
+Connecting to WebSocket...
+Subscribed to campaign 123
+Received 45/150 results (8.2s elapsed)
+Received 89/150 results (15.7s elapsed)
+Received 127/150 results (28.4s elapsed)
+Campaign completed
+```
+
+**Examples:**
+
+```python
+# Query all online hosts and get results
+result = fleet_run_live_query_with_results(
+    query="SELECT * FROM uptime",
+    target_all_online_hosts=True,
+    timeout=60.0
+)
+# Returns: {"success": true, "results": [...], "total_results_received": 127, ...}
+
+# Query specific hosts by ID
+result = fleet_run_live_query_with_results(
+    query="SELECT * FROM system_info",
+    host_ids=[1, 2, 3],
+    timeout=30.0
+)
+
+# Query hosts with a specific label
+result = fleet_run_live_query_with_results(
+    query="SELECT * FROM users WHERE username LIKE 'admin%'",
+    label_ids=[5],
+    timeout=45.0
+)
+
+# Query all hosts in a team
+result = fleet_run_live_query_with_results(
+    query="SELECT * FROM processes WHERE name = 'chrome'",
+    team_ids=[0],  # 0 = "No team"
+    timeout=60.0
+)
+```
+
+**When to Use This Tool:**
+- ✅ You need query results from **multiple hosts** programmatically
+- ✅ You want real-time progress updates as results arrive
+- ✅ You're okay with waiting up to `timeout` seconds for results
+- ✅ You need aggregated results from many hosts in one response
+
+**When to Use Alternatives:**
+- Use `fleet_query_host()` if you only need results from **one specific host** (faster, no WebSocket overhead)
+- Use `fleet_query_host_by_identifier()` if you want to query by hostname/UUID instead of host ID
+
+**Timeout Behavior:**
+- The tool waits up to `timeout` seconds for results to arrive
+- If the timeout expires, the tool returns whatever results were collected so far
+- The campaign continues running on Fleet even after timeout (results just won't be collected)
+- Recommended timeout: 60-120 seconds for large fleets (100+ hosts)
+
+**WebSocket Connection:**
+- Requires WebSocket connectivity to Fleet server (port 443 for HTTPS, port 80 for HTTP)
+- Uses the same SSL verification settings as the REST API (`verify_ssl` config)
+- Automatically handles authentication using your API token
+- Connection is closed automatically after results are collected or timeout expires
+
+**Error Handling:**
+- Returns `{"success": false, "message": "..."}` if campaign creation fails
+- Returns partial results if some hosts fail to respond
+- Individual host errors are included in the `results` array with `"error": "message"`
+- WebSocket connection errors are logged and returned in the response
+
 **Notes:**
-- For immediate results from a single host, use `fleet_query_host` instead
-- This creates a campaign that runs asynchronously across multiple hosts
 - In read-only mode, all queries are validated to ensure they are SELECT-only
+- Progress notifications are sent via MCP's standard progress reporting mechanism
+- Results are aggregated in memory - very large result sets may consume significant memory
+- This tool is ideal for investigations, audits, and compliance checks across your fleet
 
 #### `fleet_get_query_report`
 Get the latest stored results from a SCHEDULED query.
@@ -399,12 +492,12 @@ Get the latest stored results from a SCHEDULED query.
 - This tool ONLY works for scheduled queries (queries with an 'interval' set that run periodically)
 - It retrieves the stored results from the last time the scheduled query ran
 - This tool does NOT work for:
-  - Live query campaigns created by `fleet_run_live_query()`
   - Ad-hoc queries that haven't been saved and scheduled
   - Queries that don't have 'interval' configured
 - For running ad-hoc queries and getting results, use:
   - `fleet_query_host(host_id, query)` - Run query on ONE host and get results
   - `fleet_query_host_by_identifier(identifier, query)` - Run query by hostname/UUID
+  - `fleet_run_live_query_with_results(query, ...)` - Run query across multiple hosts and collect results
 
 #### `fleet_run_saved_query`
 Run a saved query against specified hosts.
@@ -1452,7 +1545,7 @@ allow_select_queries = true
 - All read-only tools from strict mode
 - `fleet_query_host` - Run SELECT queries on specific hosts
 - `fleet_query_host_by_identifier` - Run SELECT queries by hostname/UUID
-- `fleet_run_live_query` - Run SELECT queries across multiple hosts
+- `fleet_run_live_query_with_results` - Run SELECT queries across multiple hosts and collect results via WebSocket
 - `fleet_run_saved_query` - Run saved SELECT queries
 
 **Query Validation:**

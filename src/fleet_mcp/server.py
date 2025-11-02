@@ -155,7 +155,7 @@ class FleetMCPServer:
         if self.config.readonly and self.config.allow_select_queries:
             # In readonly mode with SELECT queries enabled:
             # - Register SELECT-only validated query tools from query_tools_readonly
-            # - These include: fleet_run_live_query, fleet_run_saved_query,
+            # - These include: fleet_run_live_query_with_results, fleet_run_saved_query,
             #   fleet_query_host, fleet_query_host_by_identifier (all with SELECT validation)
             # - Do NOT register host_tools.register_query_tools() to avoid duplicates
             query_tools_readonly.register_select_only_tools(self.mcp, self.client)
@@ -164,7 +164,7 @@ class FleetMCPServer:
             # - Register host_tools.register_query_tools() for host query tools
             #   (fleet_query_host, fleet_query_host_by_identifier - without SELECT validation)
             # - query_tools.register_write_tools() will also register
-            #   fleet_run_live_query and fleet_run_saved_query (without SELECT validation)
+            #   fleet_run_live_query_with_results and fleet_run_saved_query (without SELECT validation)
             host_tools.register_query_tools(self.mcp, self.client)
         # else: In strict readonly mode (readonly=True, allow_select_queries=False):
         #       Do NOT register any query tools - queries are completely disabled

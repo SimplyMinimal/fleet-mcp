@@ -25,10 +25,10 @@ class TestSelectOnlyQueryMode:
         tool_names = [t.name if hasattr(t, "name") else str(t) for t in tools]
 
         # Query execution tools should NOT be available
-        assert "fleet_run_live_query" not in tool_names
         assert "fleet_run_saved_query" not in tool_names
         assert "fleet_query_host" not in tool_names
         assert "fleet_query_host_by_identifier" not in tool_names
+        assert "fleet_run_live_query_with_results" not in tool_names
 
         # Read-only query tools should still be available
         assert "fleet_list_queries" in tool_names
@@ -48,10 +48,10 @@ class TestSelectOnlyQueryMode:
         tool_names = [t.name if hasattr(t, "name") else str(t) for t in tools]
 
         # Query execution tools SHOULD be available
-        assert "fleet_run_live_query" in tool_names
         assert "fleet_run_saved_query" in tool_names
         assert "fleet_query_host" in tool_names
         assert "fleet_query_host_by_identifier" in tool_names
+        assert "fleet_run_live_query_with_results" in tool_names
 
         # Read-only query tools should still be available
         assert "fleet_list_queries" in tool_names
@@ -77,10 +77,10 @@ class TestSelectOnlyQueryMode:
         tool_names = [t.name if hasattr(t, "name") else str(t) for t in tools]
 
         # All query tools should be available
-        assert "fleet_run_live_query" in tool_names
         assert "fleet_run_saved_query" in tool_names
         assert "fleet_query_host" in tool_names
         assert "fleet_query_host_by_identifier" in tool_names
+        assert "fleet_run_live_query_with_results" in tool_names
         assert "fleet_list_queries" in tool_names
         assert "fleet_get_query" in tool_names
 
@@ -186,7 +186,8 @@ class TestSelectOnlyQueryMode:
         tools3 = await server3.mcp.list_tools()
 
         # SELECT query mode should have 4 more tools than strict readonly
-        # (fleet_run_live_query, fleet_run_saved_query, fleet_query_host, fleet_query_host_by_identifier)
+        # (fleet_run_live_query_with_results, fleet_run_saved_query,
+        #  fleet_query_host, fleet_query_host_by_identifier)
         assert len(tools2) == len(tools1) + 4
 
         # Write mode should have more tools than SELECT query mode

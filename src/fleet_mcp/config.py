@@ -43,7 +43,7 @@ class FleetConfig(BaseSettings):
 
     allow_select_queries: bool = Field(
         default=False,
-        description="Allow SELECT-only queries in read-only mode (enables fleet_run_live_query, fleet_run_saved_query, fleet_query_host with validation)",
+        description="Allow SELECT-only queries in read-only mode (enables fleet_run_live_query_with_results, fleet_run_saved_query, fleet_query_host with validation)",
     )
 
     @field_validator("server_url")
