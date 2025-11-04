@@ -87,9 +87,11 @@ class TestFleetWebSocketClient:
         client = FleetWebSocketClient(config)
 
         mock_ws = AsyncMock()
+        connect_kwargs = {}
 
-        # Create an async context manager mock
+        # Create an async context manager mock that captures kwargs
         async def mock_connect(*args, **kwargs):
+            connect_kwargs.update(kwargs)
             return mock_ws
 
         with patch("websockets.connect", new=mock_connect):
@@ -98,6 +100,39 @@ class TestFleetWebSocketClient:
             # Verify connection was established
             assert client.ws == mock_ws
             assert client._connected is True
+
+            # Verify SSL context was provided (for verify_ssl=False)
+            assert "ssl" in connect_kwargs
+            assert connect_kwargs["ssl"] is not None
+
+    @pytest.mark.asyncio
+    async def test_connect_verify_ssl_true(self):
+        """Test WebSocket connection with SSL verification enabled (default)."""
+        config = FleetConfig(
+            server_url="https://test.fleet.com",
+            api_token="test-token",
+            verify_ssl=True,
+        )
+        client = FleetWebSocketClient(config)
+
+        mock_ws = AsyncMock()
+        connect_kwargs = {}
+
+        # Create an async context manager mock that captures kwargs
+        async def mock_connect(*args, **kwargs):
+            connect_kwargs.update(kwargs)
+            return mock_ws
+
+        with patch("websockets.connect", new=mock_connect):
+            await client.connect()
+
+            # Verify connection was established
+            assert client.ws == mock_ws
+            assert client._connected is True
+
+            # Verify SSL parameter was NOT provided (library will use default SSL context)
+            # This is the fix for the "ssl=None is incompatible with wss://" error
+            assert "ssl" not in connect_kwargs
 
     @pytest.mark.asyncio
     async def test_authenticate_success(self, websocket_client):

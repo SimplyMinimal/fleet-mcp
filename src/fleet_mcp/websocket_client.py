@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import ssl
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -61,23 +62,37 @@ class FleetWebSocketClient:
                 "Authorization": f"Bearer {self.config.api_token}",
             }
 
-            # Connect with SSL verification settings
-            # Note: websockets library uses ssl parameter differently than httpx
-            ssl_context = None
-            if not self.config.verify_ssl and ws_scheme == "wss":
-                import ssl
-
+            # Configure SSL for WebSocket connection
+            # The websockets library handles SSL differently than httpx:
+            # - For wss:// with verify_ssl=True: Don't pass ssl parameter (library creates default context)
+            # - For wss:// with verify_ssl=False: Pass custom SSL context with verification disabled
+            # - For ws://: Don't pass ssl parameter
+            ssl_context: ssl.SSLContext | None = None
+            if ws_scheme == "wss" and not self.config.verify_ssl:
+                # Disable SSL verification for wss:// connections
                 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
+                logger.debug("SSL verification disabled for WebSocket connection")
 
-            self.ws = await websockets.connect(
-                ws_url,
-                additional_headers=additional_headers,
-                ssl=ssl_context,
-                ping_interval=20,  # Send ping every 20 seconds
-                ping_timeout=10,  # Wait 10 seconds for pong
-            )
+            # Connect to WebSocket with appropriate SSL configuration
+            # For wss:// with verify_ssl=True, omit ssl parameter to use default verification
+            # For wss:// with verify_ssl=False, pass custom SSL context
+            if ssl_context is not None:
+                self.ws = await websockets.connect(
+                    ws_url,
+                    additional_headers=additional_headers,
+                    ssl=ssl_context,
+                    ping_interval=20,  # Send ping every 20 seconds
+                    ping_timeout=10,  # Wait 10 seconds for pong
+                )
+            else:
+                self.ws = await websockets.connect(
+                    ws_url,
+                    additional_headers=additional_headers,
+                    ping_interval=20,  # Send ping every 20 seconds
+                    ping_timeout=10,  # Wait 10 seconds for pong
+                )
             self._connected = True
             logger.info("WebSocket connection established")
 

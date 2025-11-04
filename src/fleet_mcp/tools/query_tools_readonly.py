@@ -26,6 +26,92 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
         client: Fleet API client
     """
 
+    async def _execute_host_query_validated(
+        host_id: int,
+        query: str,
+        identifier: str | None = None,
+        hostname: str | None = None,
+    ) -> dict[str, Any]:
+        """Internal helper to execute a SELECT-validated query against a specific host.
+
+        This function contains the shared logic for executing SELECT-validated queries
+        via the Fleet API's /hosts/{id}/query endpoint and parsing the response.
+
+        Args:
+            host_id: ID of the host to query
+            query: SQL query string to execute (already validated as SELECT-only)
+            identifier: Optional original identifier used for lookup (for error messages)
+            hostname: Optional hostname of the host (for success messages)
+
+        Returns:
+            Dict containing query results or error information.
+        """
+        try:
+            response = await client.post(
+                f"/hosts/{host_id}/query", json_data={"query": query}
+            )
+
+            if response.success and response.data:
+                rows = response.data.get("rows", [])
+                result: dict[str, Any] = {
+                    "success": True,
+                    "host_id": host_id,
+                    "query": query,
+                    "rows": rows,
+                    "row_count": len(rows),
+                }
+
+                # Add optional fields if provided
+                if identifier is not None:
+                    result["identifier"] = identifier
+                if hostname is not None:
+                    result["hostname"] = hostname
+                    result["message"] = (
+                        f"Query executed successfully on {hostname}, "
+                        f"returned {len(rows)} rows (SELECT-only validated)"
+                    )
+                else:
+                    result["message"] = (
+                        f"Query executed successfully on host {host_id}, "
+                        f"returned {len(rows)} rows (SELECT-only validated)"
+                    )
+
+                return result
+            else:
+                error_result: dict[str, Any] = {
+                    "success": False,
+                    "message": response.message,
+                    "host_id": host_id,
+                    "query": query,
+                    "rows": [],
+                    "row_count": 0,
+                }
+
+                # Add optional fields if provided
+                if identifier is not None:
+                    error_result["identifier"] = identifier
+
+                return error_result
+
+        except FleetAPIError as e:
+            error_context = identifier if identifier else str(host_id)
+            logger.error(f"Failed to query host {error_context}: {e}")
+
+            error_result = {
+                "success": False,
+                "message": f"Failed to query host: {str(e)}",
+                "host_id": host_id,
+                "query": query,
+                "rows": [],
+                "row_count": 0,
+            }
+
+            # Add optional fields if provided
+            if identifier is not None:
+                error_result["identifier"] = identifier
+
+            return error_result
+
     @mcp.tool()
     async def fleet_run_saved_query(
         query_id: int,
@@ -144,42 +230,8 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "row_count": 0,
             }
 
-        try:
-            async with client:
-                response = await client.post(
-                    f"/hosts/{host_id}/query", json_data={"query": query}
-                )
-
-                if response.success and response.data:
-                    rows = response.data.get("rows", [])
-                    return {
-                        "success": True,
-                        "host_id": host_id,
-                        "query": query,
-                        "rows": rows,
-                        "row_count": len(rows),
-                        "message": f"Query executed successfully on host {host_id}, returned {len(rows)} rows (SELECT-only validated)",
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": response.message,
-                        "host_id": host_id,
-                        "query": query,
-                        "rows": [],
-                        "row_count": 0,
-                    }
-
-        except FleetAPIError as e:
-            logger.error(f"Failed to query host {host_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to query host: {str(e)}",
-                "host_id": host_id,
-                "query": query,
-                "rows": [],
-                "row_count": 0,
-            }
+        async with client:
+            return await _execute_host_query_validated(host_id, query)
 
     @mcp.tool()
     async def fleet_query_host_by_identifier(
@@ -219,61 +271,27 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                 "row_count": 0,
             }
 
-        try:
-            async with client:
-                # Resolve the identifier to a host
-                result = await resolve_host_identifier(client, identifier)
+        async with client:
+            # Resolve the identifier to a host
+            result = await resolve_host_identifier(client, identifier)
 
-                if not result.success:
-                    return {
-                        "success": False,
-                        "message": result.error_message
-                        or f"Host not found: {identifier}",
-                        "identifier": identifier,
-                        "query": query,
-                        "rows": [],
-                        "row_count": 0,
-                    }
+            if not result.success or result.host_id is None:
+                return {
+                    "success": False,
+                    "message": result.error_message or f"Host not found: {identifier}",
+                    "identifier": identifier,
+                    "query": query,
+                    "rows": [],
+                    "row_count": 0,
+                }
 
-                # Now run the query
-                host_id = result.host_id
-                query_response = await client.post(
-                    f"/hosts/{host_id}/query", json_data={"query": query}
-                )
-
-                if query_response.success and query_response.data:
-                    rows = query_response.data.get("rows", [])
-                    return {
-                        "success": True,
-                        "identifier": identifier,
-                        "host_id": host_id,
-                        "hostname": result.hostname,
-                        "query": query,
-                        "rows": rows,
-                        "row_count": len(rows),
-                        "message": f"Query executed successfully on {result.hostname}, returned {len(rows)} rows (SELECT-only validated)",
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": query_response.message,
-                        "identifier": identifier,
-                        "host_id": host_id,
-                        "query": query,
-                        "rows": [],
-                        "row_count": 0,
-                    }
-
-        except FleetAPIError as e:
-            logger.error(f"Failed to query host {identifier}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to query host: {str(e)}",
-                "identifier": identifier,
-                "query": query,
-                "rows": [],
-                "row_count": 0,
-            }
+            # Execute query using shared helper
+            return await _execute_host_query_validated(
+                host_id=result.host_id,
+                query=query,
+                identifier=identifier,
+                hostname=result.hostname,
+            )
 
     @mcp.tool()
     async def fleet_run_live_query_with_results(

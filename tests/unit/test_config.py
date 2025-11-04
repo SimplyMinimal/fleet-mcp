@@ -97,6 +97,23 @@ class TestFleetConfig:
                 timeout=400,
             )
 
+    def test_verify_ssl_defaults_to_true(self):
+        """Test that verify_ssl defaults to True for security."""
+        config = FleetConfig(
+            server_url="https://fleet.example.com", api_token="test-token-123456789"
+        )
+        # Security best practice: SSL verification should be enabled by default
+        assert config.verify_ssl is True
+
+    def test_verify_ssl_can_be_disabled_explicitly(self):
+        """Test that verify_ssl can be explicitly disabled when needed."""
+        config = FleetConfig(
+            server_url="https://fleet.example.com",
+            api_token="test-token-123456789",
+            verify_ssl=False,
+        )
+        assert config.verify_ssl is False
+
 
 class TestConfigLoading:
     """Test configuration loading from environment and files."""
@@ -184,5 +201,21 @@ timeout = 45
 
         finally:
             config_file.unlink()
+            os.environ.pop("FLEET_SERVER_URL", None)
+            os.environ.pop("FLEET_API_TOKEN", None)
+
+    def test_verify_ssl_defaults_to_true_from_env(self):
+        """Test that verify_ssl defaults to True when not set in environment."""
+        # Set only required environment variables, omit FLEET_VERIFY_SSL
+        os.environ["FLEET_SERVER_URL"] = "https://test.fleet.com"
+        os.environ["FLEET_API_TOKEN"] = "env-token-123456789"
+
+        try:
+            config = load_config()
+
+            # Should default to True for security
+            assert config.verify_ssl is True
+
+        finally:
             os.environ.pop("FLEET_SERVER_URL", None)
             os.environ.pop("FLEET_API_TOKEN", None)
