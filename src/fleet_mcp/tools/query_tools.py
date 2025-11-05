@@ -1,24 +1,29 @@
 """Query management tools for Fleet MCP."""
 
+import asyncio
 import logging
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
 
 from ..client import FleetAPIError, FleetClient
+from ..config import FleetConfig
 
 logger = logging.getLogger(__name__)
 
 
-def register_tools(mcp: FastMCP, client: FleetClient) -> None:
+def register_tools(
+    mcp: FastMCP, client: FleetClient, config: FleetConfig | None = None
+) -> None:
     """Register all query management tools with the MCP server.
 
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
+        config: Fleet configuration (optional, for async query mode)
     """
     register_read_tools(mcp, client)
-    register_write_tools(mcp, client)
+    register_write_tools(mcp, client, config)
 
 
 def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -197,12 +202,15 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             }
 
 
-def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
+def register_write_tools(
+    mcp: FastMCP, client: FleetClient, config: FleetConfig | None = None
+) -> None:
     """Register write query management tools with the MCP server.
 
     Args:
         mcp: FastMCP server instance
         client: Fleet API client
+        config: Fleet configuration (optional, for async query mode)
     """
 
     @mcp.tool()
@@ -374,6 +382,13 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         3. Not all hosts may respond within the timeout period
         4. Results are collected in real-time as they stream in
 
+        🔄 ASYNC MODE (when FLEET_USE_ASYNC_QUERY_MODE=true):
+        - Query starts in the background and returns immediately with a campaign_id
+        - Use fleet_get_query_results(campaign_id) to retrieve results later
+        - Use fleet_list_async_queries() to see all running/completed queries
+        - Use fleet_cancel_query(campaign_id) to cancel a running query
+        - This mode works around the 60-second MCP client timeout limitation
+
         TARGETING REQUIREMENTS:
         At least ONE of the following targeting parameters is REQUIRED:
         - host_ids: List of specific host IDs
@@ -392,6 +407,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
         Returns:
             Dict containing query results from all responding hosts.
+            In async mode, returns campaign_id and status instead of results.
 
         Examples:
             # Query all online hosts with 30s timeout
@@ -417,6 +433,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         import time
 
         from ..websocket_client import FleetWebSocketClient
+
+        # Check if async mode is enabled
+        use_async_mode = config and config.use_async_query_mode
 
         # Step 1: Validate targeting parameters
         if not any([host_ids, label_ids, team_ids, target_all_online_hosts]):
@@ -530,7 +549,98 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                         f"{metrics.get('OfflineHosts', 0)} offline)"
                     )
 
-                # Step 5: Connect WebSocket and collect results
+                # Step 5: Handle async mode if enabled
+                if use_async_mode:
+                    from ..async_query_manager import get_async_query_manager
+
+                    manager = get_async_query_manager(config)
+
+                    # Create async job
+                    await manager.create_job(
+                        campaign_id=campaign_id,
+                        query=query,
+                        metadata={
+                            "host_ids": host_ids,
+                            "label_ids": label_ids,
+                            "team_ids": team_ids,
+                            "target_all_online_hosts": target_all_online_hosts,
+                            "timeout": timeout,
+                        },
+                    )
+
+                    await manager.set_total_hosts(campaign_id, total_hosts)
+
+                    # Start background task to collect results
+                    async def collect_results_background() -> None:
+                        """Background task to collect query results."""
+                        try:
+                            await manager.update_job_status(
+                                campaign_id, QueryStatus.RUNNING
+                            )
+
+                            async with FleetWebSocketClient(client.config) as ws_client:
+                                await ws_client.subscribe_to_campaign(campaign_id)
+
+                                async for message in ws_client.stream_messages(timeout):
+                                    msg_type = message.get("type")
+                                    data = message.get("data", {})
+
+                                    if msg_type == "result":
+                                        await manager.add_result(campaign_id, data)
+                                    elif msg_type == "totals":
+                                        new_total = data.get("count", total_hosts)
+                                        await manager.set_total_hosts(
+                                            campaign_id, new_total
+                                        )
+                                    elif msg_type == "status":
+                                        status = data.get("status")
+                                        if status == "finished":
+                                            break
+                                    elif msg_type == "error":
+                                        error = data.get("error", "Unknown error")
+                                        await manager.update_job_status(
+                                            campaign_id, QueryStatus.FAILED, error=error
+                                        )
+                                        return
+
+                            # Mark as completed
+                            await manager.update_job_status(
+                                campaign_id, QueryStatus.COMPLETED
+                            )
+
+                        except Exception as e:
+                            logger.error(f"Background query {campaign_id} failed: {e}")
+                            await manager.update_job_status(
+                                campaign_id, QueryStatus.FAILED, error=str(e)
+                            )
+
+                    # Import QueryStatus for background task
+                    from ..async_query_manager import QueryStatus
+
+                    # Start background task
+                    task = asyncio.create_task(collect_results_background())
+                    manager.register_background_task(campaign_id, task)
+
+                    if ctx:
+                        await ctx.info(
+                            f"Query started in background mode. "
+                            f"Use fleet_get_query_results(campaign_id={campaign_id}) to retrieve results."
+                        )
+
+                    return {
+                        "success": True,
+                        "async_mode": True,
+                        "campaign_id": campaign_id,
+                        "query": query,
+                        "total_hosts": total_hosts,
+                        "status": "running",
+                        "message": (
+                            f"Query started in background (campaign {campaign_id}). "
+                            f"Use fleet_get_query_results({campaign_id}) to retrieve results."
+                        ),
+                    }
+
+                # Step 6: Connect WebSocket and collect results (sync mode)
                 if ctx:
                     await ctx.info("Connecting to WebSocket for real-time results...")
 
@@ -543,54 +653,93 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                                 f"Subscribed to campaign {campaign_id}, collecting results..."
                             )
 
-                        results = []
+                        results: list[dict[str, Any]] = []
                         start_time = time.time()
                         last_progress_report = 0.0
+                        heartbeat_task = None
+                        stream_active = True
 
-                        async for message in ws_client.stream_messages(timeout):
-                            msg_type = message.get("type")
-                            data = message.get("data", {})
-
-                            if msg_type == "result":
-                                results.append(data)
-
-                                # Report progress (throttle to every 0.5 seconds)
+                        # Background heartbeat task to prevent MCP timeout
+                        # This runs independently of WebSocket message arrival
+                        async def heartbeat_loop() -> None:
+                            """Send periodic progress updates every 5 seconds."""
+                            last_heartbeat = 0.0
+                            while stream_active:
+                                await asyncio.sleep(1.0)  # Check every second
                                 current_time = time.time()
-                                if ctx and current_time - last_progress_report >= 0.5:
+                                if ctx and current_time - last_heartbeat >= 5.0:
                                     await ctx.report_progress(
                                         progress=len(results), total=total_hosts
                                     )
-                                    last_progress_report = current_time
-
-                                # Log progress
-                                elapsed = current_time - start_time
-                                if ctx and len(results) % 10 == 0:
-                                    await ctx.info(
-                                        f"Received {len(results)}/{total_hosts} results "
-                                        f"({elapsed:.1f}s elapsed)"
+                                    last_heartbeat = current_time
+                                    elapsed = current_time - start_time
+                                    logger.debug(
+                                        f"Heartbeat: {len(results)}/{total_hosts} results "
+                                        f"after {elapsed:.1f}s"
                                     )
 
-                            elif msg_type == "totals":
-                                # Update total if it changes
-                                new_total = data.get("count", total_hosts)
-                                if new_total != total_hosts:
-                                    total_hosts = new_total
-                                    if ctx:
+                        # Start background heartbeat task
+                        if ctx:
+                            heartbeat_task = asyncio.create_task(heartbeat_loop())
+
+                        try:
+                            async for message in ws_client.stream_messages(timeout):
+                                msg_type = message.get("type")
+                                data = message.get("data", {})
+                                current_time = time.time()
+
+                                if msg_type == "result":
+                                    results.append(data)
+
+                                    # Report progress when results arrive (throttle to every 0.5 seconds)
+                                    if (
+                                        ctx
+                                        and current_time - last_progress_report >= 0.5
+                                    ):
+                                        await ctx.report_progress(
+                                            progress=len(results), total=total_hosts
+                                        )
+                                        last_progress_report = current_time
+
+                                    # Log progress
+                                    elapsed = current_time - start_time
+                                    if ctx and len(results) % 10 == 0:
                                         await ctx.info(
-                                            f"Updated target count: {total_hosts} hosts"
+                                            f"Received {len(results)}/{total_hosts} results "
+                                            f"({elapsed:.1f}s elapsed)"
                                         )
 
-                            elif msg_type == "status":
-                                status = data.get("status")
-                                if status == "finished":
-                                    if ctx:
-                                        await ctx.info("Campaign completed")
-                                    break
+                                elif msg_type == "totals":
+                                    # Update total if it changes
+                                    new_total = data.get("count", total_hosts)
+                                    if new_total != total_hosts:
+                                        total_hosts = new_total
+                                        if ctx:
+                                            await ctx.info(
+                                                f"Updated target count: {total_hosts} hosts"
+                                            )
 
-                            elif msg_type == "error":
-                                error = data.get("error", "Unknown error")
-                                if ctx:
-                                    await ctx.warning(f"WebSocket error: {error}")
+                                elif msg_type == "status":
+                                    status = data.get("status")
+                                    if status == "finished":
+                                        if ctx:
+                                            await ctx.info("Campaign completed")
+                                        break
+
+                                elif msg_type == "error":
+                                    error = data.get("error", "Unknown error")
+                                    if ctx:
+                                        await ctx.warning(f"WebSocket error: {error}")
+
+                        finally:
+                            # Stop heartbeat task
+                            stream_active = False
+                            if heartbeat_task:
+                                heartbeat_task.cancel()
+                                try:
+                                    await heartbeat_task
+                                except asyncio.CancelledError:
+                                    pass
 
                         # Final progress report
                         if ctx:

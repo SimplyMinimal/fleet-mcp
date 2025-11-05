@@ -46,6 +46,21 @@ class FleetConfig(BaseSettings):
         description="Allow SELECT-only queries in read-only mode (enables fleet_run_live_query_with_results, fleet_run_saved_query, fleet_query_host with validation)",
     )
 
+    use_async_query_mode: bool = Field(
+        default=False,
+        description="Enable asynchronous query execution mode (workaround for MCP client 60-second timeout limitation)",
+    )
+
+    async_query_storage_dir: str = Field(
+        default=".fleet_mcp_async_queries",
+        description="Directory for storing async query results (relative to current directory or absolute path)",
+    )
+
+    async_query_retention_hours: int = Field(
+        default=24,
+        description="Number of hours to retain completed async query results before cleanup",
+    )
+
     @field_validator("server_url")
     @classmethod
     def validate_server_url(cls, v: str) -> str:
@@ -129,9 +144,14 @@ def load_config(config_file: Path | None = None) -> FleetConfig:
                     "verify_ssl",
                     "readonly",
                     "allow_select_queries",
+                    "use_async_query_mode",
                 ] and isinstance(env_value, str):
                     config_data[key] = env_value.lower() in ("true", "1", "yes", "on")
-                elif key in ["timeout", "max_retries"] and isinstance(env_value, str):
+                elif key in [
+                    "timeout",
+                    "max_retries",
+                    "async_query_retention_hours",
+                ] and isinstance(env_value, str):
                     config_data[key] = int(env_value)
                 else:
                     config_data[key] = env_value

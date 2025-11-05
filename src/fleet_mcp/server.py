@@ -9,6 +9,7 @@ from .client import FleetClient
 from .config import FleetConfig, get_default_config_file, load_config
 from .tools import (
     activity_tools,
+    async_query_tools,
     carve_tools,
     config_tools,
     device_tools,
@@ -174,7 +175,12 @@ class FleetMCPServer:
             host_tools.register_write_tools(self.mcp, self.client)
             label_tools.register_write_tools(self.mcp, self.client)
             pack_tools.register_write_tools(self.mcp, self.client)
-            query_tools.register_write_tools(self.mcp, self.client)
+            query_tools.register_write_tools(self.mcp, self.client, self.config)
+
+            # Register async query tools if async mode is enabled
+            if self.config.use_async_query_mode:
+                async_query_tools.register_tools(self.mcp, self.client, self.config)
+
             policy_tools.register_write_tools(self.mcp, self.client)
             script_tools.register_write_tools(self.mcp, self.client)
             software_tools.register_write_tools(self.mcp, self.client)

@@ -4,6 +4,7 @@ This module provides query execution tools that validate queries are SELECT-only
 before execution, allowing safe query execution in read-only mode.
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -500,54 +501,93 @@ def register_select_only_tools(mcp: FastMCP, client: FleetClient) -> None:
                                 f"Subscribed to campaign {campaign_id}, collecting results..."
                             )
 
-                        results = []
+                        results: list[dict[str, Any]] = []
                         start_time = time.time()
                         last_progress_report = 0.0
+                        heartbeat_task = None
+                        stream_active = True
 
-                        async for message in ws_client.stream_messages(timeout):
-                            msg_type = message.get("type")
-                            data = message.get("data", {})
-
-                            if msg_type == "result":
-                                results.append(data)
-
-                                # Report progress (throttle to every 0.5 seconds)
+                        # Background heartbeat task to prevent MCP timeout
+                        # This runs independently of WebSocket message arrival
+                        async def heartbeat_loop() -> None:
+                            """Send periodic progress updates every 5 seconds."""
+                            last_heartbeat = 0.0
+                            while stream_active:
+                                await asyncio.sleep(1.0)  # Check every second
                                 current_time = time.time()
-                                if ctx and current_time - last_progress_report >= 0.5:
+                                if ctx and current_time - last_heartbeat >= 5.0:
                                     await ctx.report_progress(
                                         progress=len(results), total=total_hosts
                                     )
-                                    last_progress_report = current_time
-
-                                # Log progress
-                                elapsed = current_time - start_time
-                                if ctx and len(results) % 10 == 0:
-                                    await ctx.info(
-                                        f"Received {len(results)}/{total_hosts} results "
-                                        f"({elapsed:.1f}s elapsed)"
+                                    last_heartbeat = current_time
+                                    elapsed = current_time - start_time
+                                    logger.debug(
+                                        f"Heartbeat: {len(results)}/{total_hosts} results "
+                                        f"after {elapsed:.1f}s"
                                     )
 
-                            elif msg_type == "totals":
-                                # Update total if it changes
-                                new_total = data.get("count", total_hosts)
-                                if new_total != total_hosts:
-                                    total_hosts = new_total
-                                    if ctx:
+                        # Start background heartbeat task
+                        if ctx:
+                            heartbeat_task = asyncio.create_task(heartbeat_loop())
+
+                        try:
+                            async for message in ws_client.stream_messages(timeout):
+                                msg_type = message.get("type")
+                                data = message.get("data", {})
+                                current_time = time.time()
+
+                                if msg_type == "result":
+                                    results.append(data)
+
+                                    # Report progress when results arrive (throttle to every 0.5 seconds)
+                                    if (
+                                        ctx
+                                        and current_time - last_progress_report >= 0.5
+                                    ):
+                                        await ctx.report_progress(
+                                            progress=len(results), total=total_hosts
+                                        )
+                                        last_progress_report = current_time
+
+                                    # Log progress
+                                    elapsed = current_time - start_time
+                                    if ctx and len(results) % 10 == 0:
                                         await ctx.info(
-                                            f"Updated target count: {total_hosts} hosts"
+                                            f"Received {len(results)}/{total_hosts} results "
+                                            f"({elapsed:.1f}s elapsed)"
                                         )
 
-                            elif msg_type == "status":
-                                status = data.get("status")
-                                if status == "finished":
-                                    if ctx:
-                                        await ctx.info("Campaign completed")
-                                    break
+                                elif msg_type == "totals":
+                                    # Update total if it changes
+                                    new_total = data.get("count", total_hosts)
+                                    if new_total != total_hosts:
+                                        total_hosts = new_total
+                                        if ctx:
+                                            await ctx.info(
+                                                f"Updated target count: {total_hosts} hosts"
+                                            )
 
-                            elif msg_type == "error":
-                                error = data.get("error", "Unknown error")
-                                if ctx:
-                                    await ctx.warning(f"WebSocket error: {error}")
+                                elif msg_type == "status":
+                                    status = data.get("status")
+                                    if status == "finished":
+                                        if ctx:
+                                            await ctx.info("Campaign completed")
+                                        break
+
+                                elif msg_type == "error":
+                                    error = data.get("error", "Unknown error")
+                                    if ctx:
+                                        await ctx.warning(f"WebSocket error: {error}")
+
+                        finally:
+                            # Stop heartbeat task
+                            stream_active = False
+                            if heartbeat_task:
+                                heartbeat_task.cancel()
+                                try:
+                                    await heartbeat_task
+                                except asyncio.CancelledError:
+                                    pass
 
                         # Final progress report
                         if ctx:

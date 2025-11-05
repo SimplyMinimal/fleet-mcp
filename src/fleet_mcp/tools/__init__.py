@@ -2,6 +2,7 @@
 
 from . import (
     activity_tools,
+    async_query_tools,
     carve_tools,
     config_tools,
     device_tools,
@@ -24,6 +25,7 @@ from . import (
 
 __all__ = [
     "activity_tools",
+    "async_query_tools",
     "carve_tools",
     "config_tools",
     "device_tools",
