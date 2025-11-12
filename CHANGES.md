@@ -126,4 +126,3 @@ First production-ready release of Fleet MCP.
 - [GitHub Repository](https://github.com/SimplyMinimal/fleet-mcp)
 - [Issue Tracker](https://github.com/SimplyMinimal/fleet-mcp/issues)
 - [Documentation](https://github.com/SimplyMinimal/fleet-mcp#readme)
-

@@ -155,10 +155,10 @@ class TestMyFeature:
         """Test description."""
         # Arrange
         config = test_fleet_config
-        
+
         # Act
         result = some_function(config)
-        
+
         # Assert
         assert result == expected_value
 ```
@@ -230,7 +230,7 @@ jobs:
           python-version: '3.10'
       - run: pip install -e ".[dev]"
       - run: pytest -m unit --cov=fleet_mcp
-      
+
   integration-tests:
     runs-on: ubuntu-latest
     # Only run if Fleet server is available
@@ -253,7 +253,7 @@ jobs:
 
 **Problem**: Integration tests fail with connection errors.
 
-**Solution**: 
+**Solution**:
 1. Verify Fleet server is running: `curl http://your-fleet-server:1337/healthz`
 2. Check environment variables are set correctly
 3. Verify API token has correct permissions
@@ -294,4 +294,3 @@ Check current coverage:
 ```bash
 pytest --cov=fleet_mcp --cov-report=term-missing
 ```
-

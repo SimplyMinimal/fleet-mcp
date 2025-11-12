@@ -597,10 +597,11 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                     json_data["script_id"] = script_id
 
                     # Proactive team validation for saved scripts
-                    is_compatible, error_msg = (
-                        await validate_script_host_team_compatibility(
-                            client, script_id, host_id
-                        )
+                    (
+                        is_compatible,
+                        error_msg,
+                    ) = await validate_script_host_team_compatibility(
+                        client, script_id, host_id
                     )
                     if not is_compatible:
                         logger.warning(f"Team compatibility check failed: {error_msg}")

@@ -5,10 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from fleet_mcp.tools.table_discovery import (
-    FLEET_SCHEMA_URL,
-    TableSchemaCache,
-)
+from fleet_mcp.tools.table_discovery import FLEET_SCHEMA_URL, TableSchemaCache
 
 
 @pytest.fixture

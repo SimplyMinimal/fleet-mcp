@@ -5,24 +5,24 @@ enforcement: "active"
 rules:
   # Require signed commits
   - type: "required_signatures"
-  
+
   # Block secrets
   - type: "secret_scanning"
     parameters:
       secret_scanning_push_protection: true
-      
+
   # Dependency review
   - type: "dependency_review"
     parameters:
       vulnerability_check: true
       license_check: true
-      
+
   # Restrict file paths
   - type: "file_path_restriction"
     parameters:
       restricted_file_paths:
         - "*.key"
-        - "*.pem" 
+        - "*.pem"
         - "*.p12"
         - ".env*"
         - "secrets/*"

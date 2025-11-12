@@ -7,7 +7,7 @@ rules:
   - type: "restrict_pushes"
     parameters:
       restrict_pushes_create_matching: true
-      
+
   # Require all checks to pass
   - type: "required_status_checks"
     parameters:
