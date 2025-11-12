@@ -30,7 +30,7 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
     @mcp.tool()
     async def fleet_get_query_results(
         campaign_id: int,
-        ctx: Context | None = None,  # type: ignore[type-arg]
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         """Retrieve results from a previously started asynchronous query.
 
@@ -130,7 +130,7 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
     async def fleet_list_async_queries(
         status: str | None = None,
         limit: int = 50,
-        ctx: Context | None = None,  # type: ignore[type-arg]
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         """List all asynchronous query jobs.
 
@@ -233,7 +233,7 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
     @mcp.tool()
     async def fleet_cancel_query(
         campaign_id: int,
-        ctx: Context | None = None,  # type: ignore[type-arg]
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         """Cancel a running asynchronous query.
 

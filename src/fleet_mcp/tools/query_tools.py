@@ -367,7 +367,7 @@ def register_write_tools(
         team_ids: list[int] | None = None,
         target_all_online_hosts: bool = False,
         timeout: float = 60.0,
-        ctx: Context | None = None,  # type: ignore[type-arg]
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         """Execute a live query and wait for results via WebSocket.
 
