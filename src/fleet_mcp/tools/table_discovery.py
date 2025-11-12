@@ -114,7 +114,7 @@ class TableSchemaCache:
                         self.schema_source = "cache"
                         logger.info(
                             f"Loaded {len(schemas)} table schemas from cache "
-                            f"(age: {cache_age/3600:.1f} hours)"
+                            f"(age: {cache_age / 3600:.1f} hours)"
                         )
                         return
                 except Exception as e:
@@ -352,7 +352,7 @@ class TableSchemaCache:
                         self.overrides_source = "cache"
                         logger.info(
                             f"Loaded {len(overrides)} table overrides from cache "
-                            f"(age: {cache_age/3600:.1f} hours)"
+                            f"(age: {cache_age / 3600:.1f} hours)"
                         )
                         return
                 except Exception as e:
