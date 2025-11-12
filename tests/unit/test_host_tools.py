@@ -4,11 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from mcp.server.fastmcp import FastMCP
-from tests.fixtures import TEST_ENCRYPTION_KEYS, get_test_host
 
 from fleet_mcp.client import FleetAPIError, FleetClient, FleetResponse
 from fleet_mcp.config import FleetConfig
 from fleet_mcp.tools import host_tools
+from tests.fixtures import TEST_ENCRYPTION_KEYS, get_test_host
 
 
 @pytest.fixture
