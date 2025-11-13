@@ -5,7 +5,8 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
+from .common import handle_fleet_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("get Fleet config", {"data": None})
     async def fleet_get_config() -> dict[str, Any]:
         """Get the current Fleet application configuration.
 
@@ -59,23 +61,17 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 }
             }
         """
-        try:
-            async with client:
-                response = await client.get("/api/latest/fleet/config")
-                return {
-                    "success": True,
-                    "message": "Retrieved Fleet configuration",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get Fleet config: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get config: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get("/api/latest/fleet/config")
+            from .common import format_success_response
+
+            return format_success_response(
+                "Retrieved Fleet configuration",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("get enrollment secrets", {"data": None})
     async def fleet_get_enroll_secrets() -> dict[str, Any]:
         """Get the enrollment secrets configuration.
 
@@ -85,23 +81,17 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing enrollment secrets for global and team-specific enrollment.
         """
-        try:
-            async with client:
-                response = await client.get("/api/latest/fleet/spec/enroll_secret")
-                return {
-                    "success": True,
-                    "message": "Retrieved enrollment secrets",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get enrollment secrets: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get enrollment secrets: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get("/api/latest/fleet/spec/enroll_secret")
+            from .common import format_success_response
+
+            return format_success_response(
+                "Retrieved enrollment secrets",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("get certificate", {"data": None})
     async def fleet_get_certificate() -> dict[str, Any]:
         """Get the Fleet server certificate chain.
 
@@ -110,23 +100,17 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the certificate chain.
         """
-        try:
-            async with client:
-                response = await client.get("/api/latest/fleet/config/certificate")
-                return {
-                    "success": True,
-                    "message": "Retrieved certificate chain",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get certificate: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get certificate: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get("/api/latest/fleet/config/certificate")
+            from .common import format_success_response
+
+            return format_success_response(
+                "Retrieved certificate chain",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("get Fleet version", {"data": None})
     async def fleet_get_version() -> dict[str, Any]:
         """Get the Fleet server version information.
 
@@ -136,21 +120,14 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing Fleet server version information.
         """
-        try:
-            async with client:
-                response = await client.get("/api/latest/fleet/version")
-                return {
-                    "success": True,
-                    "message": "Retrieved Fleet version",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get Fleet version: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get version: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get("/api/latest/fleet/version")
+            from .common import format_success_response
+
+            return format_success_response(
+                "Retrieved Fleet version",
+                data=response,
+            )
 
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -162,6 +139,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("update Fleet config", {"data": None})
     async def fleet_update_config(
         config: dict[str, Any],
         force: bool = False,
@@ -180,41 +158,35 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the updated configuration.
         """
-        try:
-            async with client:
-                # Build query string
-                query_params = []
-                if force:
-                    query_params.append("force=true")
-                if dry_run:
-                    query_params.append("dry_run=true")
+        async with client:
+            # Build query string
+            query_params = []
+            if force:
+                query_params.append("force=true")
+            if dry_run:
+                query_params.append("dry_run=true")
 
-                endpoint = "/api/latest/fleet/config"
-                if query_params:
-                    endpoint += "?" + "&".join(query_params)
+            endpoint = "/api/latest/fleet/config"
+            if query_params:
+                endpoint += "?" + "&".join(query_params)
 
-                response = await client.patch(
-                    endpoint,
-                    json_data=config,
-                )
-                return {
-                    "success": True,
-                    "message": (
-                        "Updated Fleet configuration"
-                        if not dry_run
-                        else "Configuration validation passed"
-                    ),
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to update Fleet config: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to update config: {str(e)}",
-                "data": None,
-            }
+            response = await client.patch(
+                endpoint,
+                json_data=config,
+            )
+            from .common import format_success_response
+
+            return format_success_response(
+                (
+                    "Updated Fleet configuration"
+                    if not dry_run
+                    else "Configuration validation passed"
+                ),
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("update enrollment secrets", {"data": None})
     async def fleet_update_enroll_secrets(
         secrets: list[str],
         dry_run: bool = False,
@@ -230,31 +202,24 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the result of the update.
         """
-        try:
-            async with client:
-                payload = {"spec": {"secrets": [{"secret": s} for s in secrets]}}
+        async with client:
+            payload = {"spec": {"secrets": [{"secret": s} for s in secrets]}}
 
-                endpoint = "/api/latest/fleet/spec/enroll_secret"
-                if dry_run:
-                    endpoint += "?dry_run=true"
+            endpoint = "/api/latest/fleet/spec/enroll_secret"
+            if dry_run:
+                endpoint += "?dry_run=true"
 
-                await client.post(
-                    endpoint,
-                    json_data=payload,
-                )
-                return {
-                    "success": True,
-                    "message": (
-                        "Updated enrollment secrets"
-                        if not dry_run
-                        else "Enrollment secrets validation passed"
-                    ),
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to update enrollment secrets: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to update enrollment secrets: {str(e)}",
-                "data": None,
-            }
+            await client.post(
+                endpoint,
+                json_data=payload,
+            )
+            from .common import format_success_response
+
+            return format_success_response(
+                (
+                    "Updated enrollment secrets"
+                    if not dry_run
+                    else "Enrollment secrets validation passed"
+                ),
+                data=None,
+            )

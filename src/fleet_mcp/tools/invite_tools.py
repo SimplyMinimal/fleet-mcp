@@ -5,7 +5,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
+from .common import (
+    build_pagination_params,
+    format_success_response,
+    handle_fleet_api_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("list invites", {"data": None})
     async def fleet_list_invites(
         page: int = 0,
         per_page: int = 100,
@@ -50,31 +56,23 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing list of pending invites.
         """
-        try:
-            async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page,
-                    "order_key": order_key,
-                    "order_direction": order_direction,
-                }
-                response = await client.get("/api/latest/fleet/invites", params=params)
-                data = response.data or {}
-                invites = data.get("invites", [])
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(invites)} pending invites",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list invites: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list invites: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            params = build_pagination_params(
+                page=page,
+                per_page=per_page,
+                order_key=order_key,
+                order_direction=order_direction,
+            )
+            response = await client.get("/api/latest/fleet/invites", params=params)
+            data = response.data or {}
+            invites = data.get("invites", [])
+            return format_success_response(
+                f"Retrieved {len(invites)} pending invites",
+                data=data,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("verify invite token", {"data": None})
     async def fleet_verify_invite(token: str) -> dict[str, Any]:
         """Verify an invite token and get invite details.
 
@@ -87,24 +85,15 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the invite details if valid.
         """
-        try:
-            async with client:
-                params = {"token": token}
-                response = await client.get(
-                    "/api/latest/fleet/invites/verify", params=params
-                )
-                return {
-                    "success": True,
-                    "message": "Invite token is valid",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to verify invite token: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to verify invite: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            params = {"token": token}
+            response = await client.get(
+                "/api/latest/fleet/invites/verify", params=params
+            )
+            return format_success_response(
+                "Invite token is valid",
+                data=response,
+            )
 
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -116,6 +105,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("create invite", {"data": None})
     async def fleet_create_invite(
         email: str,
         name: str | None = None,
@@ -143,41 +133,31 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the created invite information.
         """
-        try:
-            async with client:
-                payload: dict[str, Any] = {
-                    "email": email,
-                    "sso_enabled": sso_enabled,
-                }
-
-                if name is not None:
-                    payload["name"] = name
-                if position is not None:
-                    payload["position"] = position
-                if global_role is not None:
-                    payload["global_role"] = global_role
-                if teams is not None:
-                    payload["teams"] = teams
-
-                response = await client.post(
-                    "/api/latest/fleet/invites", json_data=payload
-                )
-                invite_data = response.data or {}
-                invite = invite_data.get("invite", {})
-                return {
-                    "success": True,
-                    "message": f"Invite sent to {email}",
-                    "data": invite,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to create invite for {email}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to create invite: {str(e)}",
-                "data": None,
+        async with client:
+            payload: dict[str, Any] = {
+                "email": email,
+                "sso_enabled": sso_enabled,
             }
 
+            if name is not None:
+                payload["name"] = name
+            if position is not None:
+                payload["position"] = position
+            if global_role is not None:
+                payload["global_role"] = global_role
+            if teams is not None:
+                payload["teams"] = teams
+
+            response = await client.post("/api/latest/fleet/invites", json_data=payload)
+            invite_data = response.data or {}
+            invite = invite_data.get("invite", {})
+            return format_success_response(
+                f"Invite sent to {email}",
+                data=invite,
+            )
+
     @mcp.tool()
+    @handle_fleet_api_errors("update invite", {"data": None})
     async def fleet_update_invite(
         invite_id: int,
         name: str | None = None,
@@ -200,44 +180,37 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the updated invite information.
         """
-        try:
-            async with client:
-                payload: dict[str, Any] = {}
+        async with client:
+            payload: dict[str, Any] = {}
 
-                if name is not None:
-                    payload["name"] = name
-                if position is not None:
-                    payload["position"] = position
-                if global_role is not None:
-                    payload["global_role"] = global_role
-                if teams is not None:
-                    payload["teams"] = teams
+            if name is not None:
+                payload["name"] = name
+            if position is not None:
+                payload["position"] = position
+            if global_role is not None:
+                payload["global_role"] = global_role
+            if teams is not None:
+                payload["teams"] = teams
 
-                if not payload:
-                    return {
-                        "success": False,
-                        "message": "No update parameters provided",
-                        "data": None,
-                    }
+            if not payload:
+                from .common import format_error_response
 
-                response = await client.patch(
-                    f"/api/latest/fleet/invites/{invite_id}",
-                    json_data=payload,
+                return format_error_response(
+                    "No update parameters provided",
+                    data=None,
                 )
-                return {
-                    "success": True,
-                    "message": f"Updated invite {invite_id}",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to update invite {invite_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to update invite: {str(e)}",
-                "data": None,
-            }
+
+            response = await client.patch(
+                f"/api/latest/fleet/invites/{invite_id}",
+                json_data=payload,
+            )
+            return format_success_response(
+                f"Updated invite {invite_id}",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("delete invite", {"data": None})
     async def fleet_delete_invite(invite_id: int) -> dict[str, Any]:
         """Delete a pending invite from Fleet.
 
@@ -249,18 +222,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the deletion result.
         """
-        try:
-            async with client:
-                await client.delete(f"/api/latest/fleet/invites/{invite_id}")
-                return {
-                    "success": True,
-                    "message": f"Deleted invite {invite_id}",
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete invite {invite_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete invite: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            await client.delete(f"/api/latest/fleet/invites/{invite_id}")
+            return format_success_response(
+                f"Deleted invite {invite_id}",
+                data=None,
+            )

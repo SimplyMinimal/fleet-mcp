@@ -5,7 +5,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
+from .common import (
+    build_pagination_params,
+    format_success_response,
+    handle_fleet_api_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +37,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("list secret variables", {"data": None})
     async def fleet_list_secrets(
         page: int = 0,
         per_page: int = 100,
@@ -50,29 +56,20 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing list of secret variable identifiers (id, name, updated_at).
         """
-        try:
-            async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page,
-                }
-                response = await client.get(
-                    "/api/latest/fleet/custom_variables",
-                    params=params,
-                )
-                data = response.data or {}
-                return {
-                    "success": True,
-                    "message": f"Retrieved {data.get('count', 0)} secret variables",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list secret variables: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list secret variables: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            params = build_pagination_params(
+                page=page,
+                per_page=per_page,
+            )
+            response = await client.get(
+                "/api/latest/fleet/custom_variables",
+                params=params,
+            )
+            data = response.data or {}
+            return format_success_response(
+                f"Retrieved {data.get('count', 0)} secret variables",
+                data=data,
+            )
 
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -84,6 +81,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("create secret variable", {"data": None})
     async def fleet_create_secret(
         name: str,
         value: str,
@@ -112,33 +110,25 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the created secret variable information with the uppercase name.
         """
-        try:
-            # Convert name to uppercase to meet Fleet's naming requirements
-            uppercase_name = name.upper()
+        # Convert name to uppercase to meet Fleet's naming requirements
+        uppercase_name = name.upper()
 
-            async with client:
-                payload = {
-                    "name": uppercase_name,
-                    "value": value,
-                }
-                response = await client.post(
-                    "/api/latest/fleet/custom_variables",
-                    json_data=payload,
-                )
-                return {
-                    "success": True,
-                    "message": f"Created secret variable '{uppercase_name}'",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to create secret variable '{name}': {e}")
-            return {
-                "success": False,
-                "message": f"Failed to create secret variable: {str(e)}",
-                "data": None,
+        async with client:
+            payload = {
+                "name": uppercase_name,
+                "value": value,
             }
+            response = await client.post(
+                "/api/latest/fleet/custom_variables",
+                json_data=payload,
+            )
+            return format_success_response(
+                f"Created secret variable '{uppercase_name}'",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("delete secret variable", {"data": None})
     async def fleet_delete_secret(secret_id: int) -> dict[str, Any]:
         """Delete a secret variable from Fleet by ID.
 
@@ -148,18 +138,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the deletion result.
         """
-        try:
-            async with client:
-                await client.delete(f"/api/latest/fleet/custom_variables/{secret_id}")
-                return {
-                    "success": True,
-                    "message": f"Deleted secret variable {secret_id}",
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete secret variable {secret_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete secret variable: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            await client.delete(f"/api/latest/fleet/custom_variables/{secret_id}")
+            return format_success_response(
+                f"Deleted secret variable {secret_id}",
+                data=None,
+            )

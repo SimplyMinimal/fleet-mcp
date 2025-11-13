@@ -5,7 +5,8 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
+from .common import handle_fleet_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("list App Store apps", {"data": None})
     async def fleet_list_app_store_apps(team_id: int | None = None) -> dict[str, Any]:
         """List App Store apps available for installation.
 
@@ -61,32 +63,26 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 }
             }
         """
-        try:
-            async with client:
-                params = {}
-                if team_id is not None:
-                    params["team_id"] = team_id
+        async with client:
+            params = {}
+            if team_id is not None:
+                params["team_id"] = team_id
 
-                response = await client.get(
-                    "/api/latest/fleet/software/app_store_apps",
-                    params=params if params else None,
-                )
-                data = response.data or {}
-                apps = data.get("app_store_apps", [])
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(apps)} App Store apps",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list App Store apps: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list App Store apps: {str(e)}",
-                "data": None,
-            }
+            response = await client.get(
+                "/api/latest/fleet/software/app_store_apps",
+                params=params if params else None,
+            )
+            data = response.data or {}
+            apps = data.get("app_store_apps", [])
+            from .common import format_success_response
+
+            return format_success_response(
+                f"Retrieved {len(apps)} App Store apps",
+                data=data,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("list VPP tokens", {"data": None})
     async def fleet_list_vpp_tokens() -> dict[str, Any]:
         """List VPP tokens configured in Fleet.
 
@@ -96,23 +92,16 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing list of VPP tokens.
         """
-        try:
-            async with client:
-                response = await client.get("/api/latest/fleet/vpp_tokens")
-                data = response.data or {}
-                tokens = data.get("vpp_tokens", [])
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(tokens)} VPP tokens",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list VPP tokens: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list VPP tokens: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get("/api/latest/fleet/vpp_tokens")
+            data = response.data or {}
+            tokens = data.get("vpp_tokens", [])
+            from .common import format_success_response
+
+            return format_success_response(
+                f"Retrieved {len(tokens)} VPP tokens",
+                data=data,
+            )
 
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -124,6 +113,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("add App Store app", {"data": None})
     async def fleet_add_app_store_app(
         app_store_id: str,
         platform: str,
@@ -150,40 +140,34 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the software title ID of the added app.
         """
-        try:
-            async with client:
-                payload: dict[str, Any] = {
-                    "app_store_id": app_store_id,
-                    "platform": platform,
-                    "self_service": self_service,
-                    "automatic_install": automatic_install,
-                }
-                if team_id is not None:
-                    payload["team_id"] = team_id
-                if labels_include_any is not None:
-                    payload["labels_include_any"] = labels_include_any
-                if labels_exclude_any is not None:
-                    payload["labels_exclude_any"] = labels_exclude_any
-
-                response = await client.post(
-                    "/api/latest/fleet/software/app_store_apps", json_data=payload
-                )
-                data = response.data or {}
-                title_id = data.get("software_title_id")
-                return {
-                    "success": True,
-                    "message": f"Added App Store app {app_store_id} (title ID: {title_id})",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to add App Store app {app_store_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to add App Store app: {str(e)}",
-                "data": None,
+        async with client:
+            payload: dict[str, Any] = {
+                "app_store_id": app_store_id,
+                "platform": platform,
+                "self_service": self_service,
+                "automatic_install": automatic_install,
             }
+            if team_id is not None:
+                payload["team_id"] = team_id
+            if labels_include_any is not None:
+                payload["labels_include_any"] = labels_include_any
+            if labels_exclude_any is not None:
+                payload["labels_exclude_any"] = labels_exclude_any
+
+            response = await client.post(
+                "/api/latest/fleet/software/app_store_apps", json_data=payload
+            )
+            data = response.data or {}
+            title_id = data.get("software_title_id")
+            from .common import format_success_response
+
+            return format_success_response(
+                f"Added App Store app {app_store_id} (title ID: {title_id})",
+                data=data,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("update App Store app", {"data": None})
     async def fleet_update_app_store_app(
         title_id: int,
         team_id: int | None = None,
@@ -206,36 +190,30 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the updated app information.
         """
-        try:
-            async with client:
-                payload: dict[str, Any] = {
-                    "self_service": self_service,
-                }
-                if team_id is not None:
-                    payload["team_id"] = team_id
-                if labels_include_any is not None:
-                    payload["labels_include_any"] = labels_include_any
-                if labels_exclude_any is not None:
-                    payload["labels_exclude_any"] = labels_exclude_any
-
-                response = await client.patch(
-                    f"/api/latest/fleet/software/titles/{title_id}/app_store_app",
-                    json_data=payload,
-                )
-                return {
-                    "success": True,
-                    "message": f"Updated App Store app (title ID: {title_id})",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to update App Store app {title_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to update App Store app: {str(e)}",
-                "data": None,
+        async with client:
+            payload: dict[str, Any] = {
+                "self_service": self_service,
             }
+            if team_id is not None:
+                payload["team_id"] = team_id
+            if labels_include_any is not None:
+                payload["labels_include_any"] = labels_include_any
+            if labels_exclude_any is not None:
+                payload["labels_exclude_any"] = labels_exclude_any
+
+            response = await client.patch(
+                f"/api/latest/fleet/software/titles/{title_id}/app_store_app",
+                json_data=payload,
+            )
+            from .common import format_success_response
+
+            return format_success_response(
+                f"Updated App Store app (title ID: {title_id})",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("delete VPP token", {"data": None})
     async def fleet_delete_vpp_token(token_id: int) -> dict[str, Any]:
         """Delete a VPP token.
 
@@ -248,18 +226,11 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the result of the deletion.
         """
-        try:
-            async with client:
-                await client.delete(f"/api/latest/fleet/vpp_tokens/{token_id}")
-                return {
-                    "success": True,
-                    "message": f"VPP token {token_id} deleted successfully",
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete VPP token {token_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete VPP token: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            await client.delete(f"/api/latest/fleet/vpp_tokens/{token_id}")
+            from .common import format_success_response
+
+            return format_success_response(
+                f"VPP token {token_id} deleted successfully",
+                data=None,
+            )

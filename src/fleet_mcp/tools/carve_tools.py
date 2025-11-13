@@ -5,7 +5,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
+from .common import (
+    build_pagination_params,
+    format_success_response,
+    handle_fleet_api_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,7 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("list carves", {"data": None})
     async def fleet_list_carves(
         page: int = 0,
         per_page: int = 100,
@@ -42,30 +48,22 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing list of carve sessions and pagination metadata.
         """
-        try:
-            async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page,
-                    "order_key": order_key,
-                    "order_direction": order_direction,
-                }
-                response = await client.get("/api/latest/fleet/carves", params=params)
-                data = response.data or {}
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(data.get('carves', []))} carves",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list carves: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list carves: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            params = build_pagination_params(
+                page=page,
+                per_page=per_page,
+                order_key=order_key,
+                order_direction=order_direction,
+            )
+            response = await client.get("/api/latest/fleet/carves", params=params)
+            data = response.data or {}
+            return format_success_response(
+                f"Retrieved {len(data.get('carves', []))} carves",
+                data=data,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("get carve", {"data": None})
     async def fleet_get_carve(carve_id: int) -> dict[str, Any]:
         """Get detailed information about a specific carve session.
 
@@ -76,23 +74,15 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
             Dict containing detailed carve session information including
             metadata, status, and block information.
         """
-        try:
-            async with client:
-                response = await client.get(f"/api/latest/fleet/carves/{carve_id}")
-                return {
-                    "success": True,
-                    "message": f"Retrieved carve {carve_id}",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get carve {carve_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get carve: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get(f"/api/latest/fleet/carves/{carve_id}")
+            return format_success_response(
+                f"Retrieved carve {carve_id}",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("get carve block", {"data": None})
     async def fleet_get_carve_block(
         carve_id: int,
         block_id: int,
@@ -109,20 +99,11 @@ def register_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the block data (base64 encoded).
         """
-        try:
-            async with client:
-                response = await client.get(
-                    f"/api/latest/fleet/carves/{carve_id}/block/{block_id}"
-                )
-                return {
-                    "success": True,
-                    "message": f"Retrieved block {block_id} from carve {carve_id}",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get block {block_id} from carve {carve_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get carve block: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get(
+                f"/api/latest/fleet/carves/{carve_id}/block/{block_id}"
+            )
+            return format_success_response(
+                f"Retrieved block {block_id} from carve {carve_id}",
+                data=response,
+            )
