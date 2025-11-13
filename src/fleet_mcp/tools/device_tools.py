@@ -8,7 +8,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
+from .common import (
+    format_error_response,
+    format_success_response,
+    handle_fleet_api_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +37,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("get device info", {"device": {}})
     async def fleet_get_device_info(device_token: str) -> dict[str, Any]:
         """Get device information using a device token.
 
@@ -48,30 +54,19 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             >>> result = await fleet_get_device_info(device_token="abc123...")
             >>> print(result["device"])
         """
-        try:
-            async with client:
-                response = await client.get(f"/device/{device_token}")
+        async with client:
+            response = await client.get(f"/device/{device_token}")
 
-                if response.success and response.data:
-                    return {
-                        "success": True,
-                        "device": response.data,
-                        "message": "Retrieved device information successfully",
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": response.message,
-                        "device": {},
-                    }
-
-        except FleetAPIError as e:
-            logger.error(f"Failed to get device info: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get device info: {str(e)}",
-                "device": {},
-            }
+            if response.success and response.data:
+                return format_success_response(
+                    "Retrieved device information successfully",
+                    device=response.data,
+                )
+            else:
+                return format_error_response(
+                    response.message,
+                    device={},
+                )
 
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:

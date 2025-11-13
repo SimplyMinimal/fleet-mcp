@@ -6,6 +6,11 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from ..client import FleetAPIError, FleetClient
+from .common import (
+    build_pagination_params,
+    format_error_response,
+    format_success_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +56,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page,
-                    "order_key": order_key,
-                    "order_direction": order_direction,
-                }
+                params = build_pagination_params(
+                    page=page,
+                    per_page=per_page,
+                    order_key=order_key,
+                    order_direction=order_direction,
+                )
 
                 response = await client.get(
                     "/api/latest/fleet/activities", params=params
@@ -64,36 +69,30 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 # Explicit success check to prevent incorrect success reporting
                 if not response.success or not response.data:
-                    return {
-                        "success": False,
-                        "message": response.message or "No data returned from API",
-                        "data": None,
-                    }
+                    return format_error_response(
+                        response.message or "No data returned from API",
+                        data=None,
+                    )
 
                 data = response.data
                 activities = data.get("activities", [])
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(activities)} activities",
-                    "data": data,
-                }
+                return format_success_response(
+                    f"Retrieved {len(activities)} activities",
+                    data=data,
+                )
         except FleetAPIError as e:
             logger.error(f"Failed to list activities: {e}")
 
             # Provide helpful message for 403 Forbidden errors
             if e.status_code == 403:
-                return {
-                    "success": False,
-                    "message": (
-                        "Failed to list activities: Access denied (403 Forbidden). "
-                        "This endpoint requires appropriate permissions. "
-                        "Please verify that your API token has the necessary privileges."
-                    ),
-                    "data": None,
-                }
+                return format_error_response(
+                    "Failed to list activities: Access denied (403 Forbidden). "
+                    "This endpoint requires appropriate permissions. "
+                    "Please verify that your API token has the necessary privileges.",
+                    data=None,
+                )
 
-            return {
-                "success": False,
-                "message": f"Failed to list activities: {str(e)}",
-                "data": None,
-            }
+            return format_error_response(
+                f"Failed to list activities: {str(e)}",
+                data=None,
+            )

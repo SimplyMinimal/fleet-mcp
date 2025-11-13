@@ -6,6 +6,12 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from ..client import FleetAPIError, FleetClient
+from .common import (
+    build_pagination_params,
+    format_error_response,
+    format_success_response,
+    handle_fleet_api_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,54 +61,46 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         try:
             async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page,
-                    "order_key": order_key,
-                    "order_direction": order_direction,
-                }
-                if query:
-                    params["query"] = query
-                if team_id is not None:
-                    params["team_id"] = team_id
+                params = build_pagination_params(
+                    page=page,
+                    per_page=per_page,
+                    order_key=order_key,
+                    order_direction=order_direction,
+                    query=query if query else None,
+                    team_id=team_id,
+                )
 
                 response = await client.get("/api/latest/fleet/users", params=params)
 
                 # Explicit success check to prevent incorrect success reporting
                 if not response.success or not response.data:
-                    return {
-                        "success": False,
-                        "message": response.message or "No data returned from API",
-                        "data": None,
-                    }
+                    return format_error_response(
+                        response.message or "No data returned from API",
+                        data=None,
+                    )
 
                 data = response.data
                 users = data.get("users", [])
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(users)} users",
-                    "data": data,
-                }
+                return format_success_response(
+                    f"Retrieved {len(users)} users",
+                    data=data,
+                )
         except FleetAPIError as e:
             logger.error(f"Failed to list users: {e}")
 
             # Provide helpful message for 403 Forbidden errors
             if e.status_code == 403:
-                return {
-                    "success": False,
-                    "message": (
-                        "Failed to list users: Access denied (403 Forbidden). "
-                        "This endpoint requires admin-level permissions. "
-                        "Please verify that your API token has admin privileges."
-                    ),
-                    "data": None,
-                }
+                return format_error_response(
+                    "Failed to list users: Access denied (403 Forbidden). "
+                    "This endpoint requires admin-level permissions. "
+                    "Please verify that your API token has admin privileges.",
+                    data=None,
+                )
 
-            return {
-                "success": False,
-                "message": f"Failed to list users: {str(e)}",
-                "data": None,
-            }
+            return format_error_response(
+                f"Failed to list users: {str(e)}",
+                data=None,
+            )
 
     @mcp.tool()
     async def fleet_get_user(
@@ -133,42 +131,37 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
                 # Explicit success check to prevent incorrect success reporting
                 if not response.success or not response.data:
-                    return {
-                        "success": False,
-                        "message": response.message or "No data returned from API",
-                        "user_id": user_id,
-                        "data": None,
-                    }
+                    return format_error_response(
+                        response.message or "No data returned from API",
+                        user_id=user_id,
+                        data=None,
+                    )
 
-                return {
-                    "success": True,
-                    "message": f"Retrieved user {user_id}",
-                    "data": response.data,
-                }
+                return format_success_response(
+                    f"Retrieved user {user_id}",
+                    data=response.data,
+                )
         except FleetAPIError as e:
             logger.error(f"Failed to get user {user_id}: {e}")
 
             # Provide helpful message for 403 Forbidden errors
             if e.status_code == 403:
-                return {
-                    "success": False,
-                    "message": (
-                        "Failed to get user: Access denied (403 Forbidden). "
-                        "This endpoint requires admin-level permissions. "
-                        "Please verify that your API token has admin privileges."
-                    ),
-                    "user_id": user_id,
-                    "data": None,
-                }
+                return format_error_response(
+                    "Failed to get user: Access denied (403 Forbidden). "
+                    "This endpoint requires admin-level permissions. "
+                    "Please verify that your API token has admin privileges.",
+                    user_id=user_id,
+                    data=None,
+                )
 
-            return {
-                "success": False,
-                "message": f"Failed to get user {user_id}: {str(e)}",
-                "user_id": user_id,
-                "data": None,
-            }
+            return format_error_response(
+                f"Failed to get user {user_id}: {str(e)}",
+                user_id=user_id,
+                data=None,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("list user sessions", {"data": None})
     async def fleet_list_user_sessions(user_id: int) -> dict[str, Any]:
         """List active sessions for a user.
 
@@ -180,27 +173,17 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing list of user sessions.
         """
-        try:
-            async with client:
-                response = await client.get(
-                    f"/api/latest/fleet/users/{user_id}/sessions"
-                )
-                data = response.data or {}
-                sessions = data.get("sessions", [])
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(sessions)} sessions for user {user_id}",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list sessions for user {user_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list user sessions: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get(f"/api/latest/fleet/users/{user_id}/sessions")
+            data = response.data or {}
+            sessions = data.get("sessions", [])
+            return format_success_response(
+                f"Retrieved {len(sessions)} sessions for user {user_id}",
+                data=data,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("get session", {"data": None})
     async def fleet_get_session(session_id: int) -> dict[str, Any]:
         """Get session details by ID.
 
@@ -212,21 +195,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing session details.
         """
-        try:
-            async with client:
-                response = await client.get(f"/api/latest/fleet/sessions/{session_id}")
-                return {
-                    "success": True,
-                    "message": f"Retrieved session {session_id}",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get session {session_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get session: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get(f"/api/latest/fleet/sessions/{session_id}")
+            return format_success_response(
+                f"Retrieved session {session_id}",
+                data=response,
+            )
 
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -238,6 +212,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("create user", {"data": None})
     async def fleet_create_user(
         name: str,
         email: str,
@@ -266,41 +241,33 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the created user and optional API token.
         """
-        try:
-            async with client:
-                payload: dict[str, Any] = {
-                    "name": name,
-                    "email": email,
-                    "sso_enabled": sso_enabled,
-                    "api_only": api_only,
-                }
-                if password is not None:
-                    payload["password"] = password
-                if global_role is not None:
-                    payload["global_role"] = global_role
-                if teams is not None:
-                    payload["teams"] = teams
-
-                response = await client.post(
-                    "/api/latest/fleet/users/admin", json_data=payload
-                )
-                data = response.data or {}
-                user = data.get("user", {})
-                user_id = user.get("id", "unknown")
-                return {
-                    "success": True,
-                    "message": f"Created user {name} (ID: {user_id})",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to create user {email}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to create user: {str(e)}",
-                "data": None,
+        async with client:
+            payload: dict[str, Any] = {
+                "name": name,
+                "email": email,
+                "sso_enabled": sso_enabled,
+                "api_only": api_only,
             }
+            if password is not None:
+                payload["password"] = password
+            if global_role is not None:
+                payload["global_role"] = global_role
+            if teams is not None:
+                payload["teams"] = teams
+
+            response = await client.post(
+                "/api/latest/fleet/users/admin", json_data=payload
+            )
+            data = response.data or {}
+            user = data.get("user", {})
+            user_id = user.get("id", "unknown")
+            return format_success_response(
+                f"Created user {name} (ID: {user_id})",
+                data=data,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("update user", {"data": None})
     async def fleet_update_user(
         user_id: int,
         name: str | None = None,
@@ -328,39 +295,30 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the updated user information.
         """
-        try:
-            async with client:
-                payload: dict[str, Any] = {}
-                if name is not None:
-                    payload["name"] = name
-                if email is not None:
-                    payload["email"] = email
-                if password is not None:
-                    payload["password"] = password
-                if global_role is not None:
-                    payload["global_role"] = global_role
-                if teams is not None:
-                    payload["teams"] = teams
-                if sso_enabled is not None:
-                    payload["sso_enabled"] = sso_enabled
-                if api_only is not None:
-                    payload["api_only"] = api_only
+        async with client:
+            payload: dict[str, Any] = {}
+            if name is not None:
+                payload["name"] = name
+            if email is not None:
+                payload["email"] = email
+            if password is not None:
+                payload["password"] = password
+            if global_role is not None:
+                payload["global_role"] = global_role
+            if teams is not None:
+                payload["teams"] = teams
+            if sso_enabled is not None:
+                payload["sso_enabled"] = sso_enabled
+            if api_only is not None:
+                payload["api_only"] = api_only
 
-                response = await client.patch(
-                    f"/api/latest/fleet/users/{user_id}", json_data=payload
-                )
-                return {
-                    "success": True,
-                    "message": f"Updated user {user_id}",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to update user {user_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to update user: {str(e)}",
-                "data": None,
-            }
+            response = await client.patch(
+                f"/api/latest/fleet/users/{user_id}", json_data=payload
+            )
+            return format_success_response(
+                f"Updated user {user_id}",
+                data=response,
+            )
 
     # TODO: Disabled for now as it is too dangerous. Revisit later if really needed.
     # @mcp.tool()
@@ -392,6 +350,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     #         }
 
     @mcp.tool()
+    @handle_fleet_api_errors("delete session", {"data": None})
     async def fleet_delete_session(session_id: int) -> dict[str, Any]:
         """Delete/invalidate a specific session.
 
@@ -403,23 +362,15 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the result of the deletion.
         """
-        try:
-            async with client:
-                await client.delete(f"/api/latest/fleet/sessions/{session_id}")
-                return {
-                    "success": True,
-                    "message": f"Deleted session {session_id}",
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete session {session_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete session: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            await client.delete(f"/api/latest/fleet/sessions/{session_id}")
+            return format_success_response(
+                f"Deleted session {session_id}",
+                data=None,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("delete user sessions", {"data": None})
     async def fleet_delete_user_sessions(user_id: int) -> dict[str, Any]:
         """Delete all sessions for a specific user.
 
@@ -431,21 +382,12 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the result of the deletion.
         """
-        try:
-            async with client:
-                await client.delete(f"/api/latest/fleet/users/{user_id}/sessions")
-                return {
-                    "success": True,
-                    "message": f"Deleted all sessions for user {user_id}",
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete sessions for user {user_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete user sessions: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            await client.delete(f"/api/latest/fleet/users/{user_id}/sessions")
+            return format_success_response(
+                f"Deleted all sessions for user {user_id}",
+                data=None,
+            )
 
     # TODO: Disabled for now as it is too dangerous. Revisit later if really needed.
     # @mcp.tool()
