@@ -13,6 +13,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from ..async_query_manager import QueryStatus, get_async_query_manager
 from ..client import FleetClient
 from ..config import FleetConfig
+from .common import format_error_response, format_success_response
 
 logger = logging.getLogger(__name__)
 
@@ -62,15 +63,15 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
             # Check status of a running query
             fleet_get_query_results(campaign_id=12346)
         """
+
         try:
             job = await manager.get_job(campaign_id)
 
             if not job:
-                return {
-                    "success": False,
-                    "message": f"Query job {campaign_id} not found",
-                    "campaign_id": campaign_id,
-                }
+                return format_error_response(
+                    f"Query job {campaign_id} not found",
+                    campaign_id=campaign_id,
+                )
 
             elapsed_time = None
             if job.started_at:
@@ -79,20 +80,20 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
                 else:
                     elapsed_time = time.time() - job.started_at
 
-            response = {
-                "success": True,
-                "status": job.status.value,
-                "campaign_id": job.campaign_id,
-                "query": job.query,
-                "total_hosts": job.total_hosts,
-                "results_count": job.results_count,
-                "results": job.results,
-                "created_at": job.created_at,
-                "started_at": job.started_at,
-                "completed_at": job.completed_at,
-                "elapsed_time": elapsed_time,
-                "metadata": job.metadata,
-            }
+            response = format_success_response(
+                f"Retrieved query results for campaign {campaign_id}",
+                status=job.status.value,
+                campaign_id=job.campaign_id,
+                query=job.query,
+                total_hosts=job.total_hosts,
+                results_count=job.results_count,
+                results=job.results,
+                created_at=job.created_at,
+                started_at=job.started_at,
+                completed_at=job.completed_at,
+                elapsed_time=elapsed_time,
+                metadata=job.metadata,
+            )
 
             if job.error:
                 response["error"] = job.error
@@ -120,11 +121,10 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
 
         except Exception as e:
             logger.error(f"Failed to get query results for {campaign_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get query results: {str(e)}",
-                "campaign_id": campaign_id,
-            }
+            return format_error_response(
+                f"Failed to get query results: {str(e)}",
+                campaign_id=campaign_id,
+            )
 
     @mcp.tool()
     async def fleet_list_async_queries(
@@ -158,17 +158,17 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
             # List last 10 queries
             fleet_list_async_queries(limit=10)
         """
+
         try:
             status_filter = None
             if status:
                 try:
                     status_filter = QueryStatus(status.lower())
                 except ValueError:
-                    return {
-                        "success": False,
-                        "message": f"Invalid status: {status}. Must be one of: "
-                        f"{', '.join(s.value for s in QueryStatus)}",
-                    }
+                    return format_error_response(
+                        f"Invalid status: {status}. Must be one of: "
+                        f"{', '.join(s.value for s in QueryStatus)}"
+                    )
 
             jobs = await manager.list_jobs(status_filter=status_filter, limit=limit)
 
@@ -214,21 +214,20 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
                     f"{completed_count} completed)"
                 )
 
-            return {
-                "success": True,
-                "queries": queries,
-                "count": len(queries),
-                "total_count": total_count,
-            }
+            return format_success_response(
+                f"Found {len(queries)} async queries",
+                queries=queries,
+                count=len(queries),
+                total_count=total_count,
+            )
 
         except Exception as e:
             logger.error(f"Failed to list async queries: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list async queries: {str(e)}",
-                "queries": [],
-                "count": 0,
-            }
+            return format_error_response(
+                f"Failed to list async queries: {str(e)}",
+                queries=[],
+                count=0,
+            )
 
     @mcp.tool()
     async def fleet_cancel_query(
@@ -253,49 +252,45 @@ def register_tools(mcp: FastMCP, client: FleetClient, config: FleetConfig) -> No
             # Cancel a running query
             fleet_cancel_query(campaign_id=12345)
         """
+
         try:
             job = await manager.get_job(campaign_id)
 
             if not job:
-                return {
-                    "success": False,
-                    "message": f"Query job {campaign_id} not found",
-                    "campaign_id": campaign_id,
-                }
+                return format_error_response(
+                    f"Query job {campaign_id} not found",
+                    campaign_id=campaign_id,
+                )
 
             if job.status in (
                 QueryStatus.COMPLETED,
                 QueryStatus.FAILED,
                 QueryStatus.CANCELLED,
             ):
-                return {
-                    "success": False,
-                    "message": f"Cannot cancel query with status: {job.status.value}",
-                    "campaign_id": campaign_id,
-                    "status": job.status.value,
-                }
+                return format_error_response(
+                    f"Cannot cancel query with status: {job.status.value}",
+                    campaign_id=campaign_id,
+                    status=job.status.value,
+                )
 
             cancelled = await manager.cancel_job(campaign_id)
 
             if cancelled:
                 if ctx:
                     await ctx.info(f"Successfully cancelled query {campaign_id}")
-                return {
-                    "success": True,
-                    "message": f"Query {campaign_id} cancelled successfully",
-                    "campaign_id": campaign_id,
-                }
+                return format_success_response(
+                    f"Query {campaign_id} cancelled successfully",
+                    campaign_id=campaign_id,
+                )
             else:
-                return {
-                    "success": False,
-                    "message": f"Failed to cancel query {campaign_id}",
-                    "campaign_id": campaign_id,
-                }
+                return format_error_response(
+                    f"Failed to cancel query {campaign_id}",
+                    campaign_id=campaign_id,
+                )
 
         except Exception as e:
             logger.error(f"Failed to cancel query {campaign_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to cancel query: {str(e)}",
-                "campaign_id": campaign_id,
-            }
+            return format_error_response(
+                f"Failed to cancel query: {str(e)}",
+                campaign_id=campaign_id,
+            )
