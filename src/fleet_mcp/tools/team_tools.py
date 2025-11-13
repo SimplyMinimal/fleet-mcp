@@ -8,6 +8,9 @@ from mcp.server.fastmcp import FastMCP
 from ..client import FleetClient
 from .common import (
     build_pagination_params,
+    format_error_response,
+    format_list_response,
+    format_success_response,
     handle_fleet_api_errors,
 )
 
@@ -67,7 +70,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
             if response.success and response.data:
                 teams = response.data.get("teams", [])
-                from .common import format_list_response
 
                 return format_list_response(
                     items=teams,
@@ -76,7 +78,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     per_page=per_page,
                 )
             else:
-                from .common import format_error_response
 
                 return format_error_response(
                     response.message,
@@ -100,7 +101,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
             if response.success and response.data:
                 team = response.data.get("team", {})
-                from .common import format_success_response
 
                 return format_success_response(
                     f"Retrieved team '{team.get('name', team_id)}'",
@@ -108,7 +108,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     team_id=team_id,
                 )
             else:
-                from .common import format_error_response
 
                 return format_error_response(
                     response.message,
@@ -138,7 +137,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
             if response.success and response.data:
                 users = response.data.get("users", [])
-                from .common import format_success_response
 
                 return format_success_response(
                     f"Found {len(users)} users in team {team_id}",
@@ -147,7 +145,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     count=len(users),
                 )
             else:
-                from .common import format_error_response
 
                 return format_error_response(
                     response.message,
@@ -178,7 +175,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
 
             if response.success and response.data:
                 secrets = response.data.get("secrets", [])
-                from .common import format_success_response
 
                 return format_success_response(
                     f"Found {len(secrets)} secrets for team {team_id}",
@@ -187,7 +183,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                     count=len(secrets),
                 )
             else:
-                from .common import format_error_response
 
                 return format_error_response(
                     response.message,
@@ -229,14 +224,12 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
 
             if response.success and response.data:
                 team = response.data.get("team", {})
-                from .common import format_success_response
 
                 return format_success_response(
                     f"Created team '{name}' with ID {team.get('id')}",
                     team=team,
                 )
             else:
-                from .common import format_error_response
 
                 return format_error_response(response.message, team=None)
 
@@ -263,7 +256,6 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             response = await client.patch(
                 f"/teams/{team_id}/users", json_data=json_data
             )
-            from .common import format_success_response
 
             return format_success_response(
                 response.message or f"Added {len(user_ids)} users to team {team_id}",
@@ -293,7 +285,6 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             response = await client.delete(
                 f"/teams/{team_id}/users", json_data=json_data
             )
-            from .common import format_success_response
 
             return format_success_response(
                 response.message or f"Removed user {user_id} from team {team_id}",

@@ -6,7 +6,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from ..client import FleetClient
-from .common import handle_fleet_api_errors
+from .common import format_success_response, handle_fleet_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         async with client:
             response = await client.get("/api/latest/fleet/config")
-            from .common import format_success_response
 
             return format_success_response(
                 "Retrieved Fleet configuration",
@@ -83,7 +82,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         async with client:
             response = await client.get("/api/latest/fleet/spec/enroll_secret")
-            from .common import format_success_response
 
             return format_success_response(
                 "Retrieved enrollment secrets",
@@ -102,7 +100,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         async with client:
             response = await client.get("/api/latest/fleet/config/certificate")
-            from .common import format_success_response
 
             return format_success_response(
                 "Retrieved certificate chain",
@@ -122,7 +119,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         async with client:
             response = await client.get("/api/latest/fleet/version")
-            from .common import format_success_response
 
             return format_success_response(
                 "Retrieved Fleet version",
@@ -174,7 +170,6 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 endpoint,
                 json_data=config,
             )
-            from .common import format_success_response
 
             return format_success_response(
                 (
@@ -213,7 +208,6 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 endpoint,
                 json_data=payload,
             )
-            from .common import format_success_response
 
             return format_success_response(
                 (

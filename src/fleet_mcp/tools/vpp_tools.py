@@ -6,7 +6,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from ..client import FleetClient
-from .common import handle_fleet_api_errors
+from .common import format_success_response, handle_fleet_api_errors
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             )
             data = response.data or {}
             apps = data.get("app_store_apps", [])
-            from .common import format_success_response
 
             return format_success_response(
                 f"Retrieved {len(apps)} App Store apps",
@@ -96,7 +95,6 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             response = await client.get("/api/latest/fleet/vpp_tokens")
             data = response.data or {}
             tokens = data.get("vpp_tokens", [])
-            from .common import format_success_response
 
             return format_success_response(
                 f"Retrieved {len(tokens)} VPP tokens",
@@ -159,7 +157,6 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             )
             data = response.data or {}
             title_id = data.get("software_title_id")
-            from .common import format_success_response
 
             return format_success_response(
                 f"Added App Store app {app_store_id} (title ID: {title_id})",
@@ -205,7 +202,6 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 f"/api/latest/fleet/software/titles/{title_id}/app_store_app",
                 json_data=payload,
             )
-            from .common import format_success_response
 
             return format_success_response(
                 f"Updated App Store app (title ID: {title_id})",
@@ -228,7 +224,6 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         """
         async with client:
             await client.delete(f"/api/latest/fleet/vpp_tokens/{token_id}")
-            from .common import format_success_response
 
             return format_success_response(
                 f"VPP token {token_id} deleted successfully",
