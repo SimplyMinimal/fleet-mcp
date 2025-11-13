@@ -5,7 +5,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ..client import FleetAPIError, FleetClient
+from ..client import FleetClient
+from .common import (
+    build_pagination_params,
+    format_success_response,
+    handle_fleet_api_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("list packs", {"data": None})
     async def fleet_list_packs(
         page: int = 0,
         per_page: int = 100,
@@ -49,33 +55,24 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing list of packs and pagination metadata.
         """
-        try:
-            async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page,
-                    "order_key": order_key,
-                    "order_direction": order_direction,
-                }
-                if team_id is not None:
-                    params["team_id"] = team_id
+        async with client:
+            params = build_pagination_params(
+                page=page,
+                per_page=per_page,
+                order_key=order_key,
+                order_direction=order_direction,
+                team_id=team_id,
+            )
 
-                response = await client.get("/api/latest/fleet/packs", params=params)
-                data = response.data or {}
-                return {
-                    "success": True,
-                    "message": f"Retrieved {len(data.get('packs', []))} packs",
-                    "data": data,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list packs: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list packs: {str(e)}",
-                "data": None,
-            }
+            response = await client.get("/api/latest/fleet/packs", params=params)
+            data = response.data or {}
+            return format_success_response(
+                f"Retrieved {len(data.get('packs', []))} packs",
+                data=data,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("get pack", {"data": None})
     async def fleet_get_pack(pack_id: int) -> dict[str, Any]:
         """Get detailed information about a specific pack.
 
@@ -85,23 +82,15 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing detailed pack information including queries.
         """
-        try:
-            async with client:
-                response = await client.get(f"/api/latest/fleet/packs/{pack_id}")
-                return {
-                    "success": True,
-                    "message": f"Retrieved pack {pack_id}",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to get pack {pack_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to get pack: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            response = await client.get(f"/api/latest/fleet/packs/{pack_id}")
+            return format_success_response(
+                f"Retrieved pack {pack_id}",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("list scheduled queries", {"data": None})
     async def fleet_list_scheduled_queries(
         pack_id: int,
         page: int = 0,
@@ -117,28 +106,19 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing list of scheduled queries in the pack.
         """
-        try:
-            async with client:
-                params = {
-                    "page": page,
-                    "per_page": per_page,
-                }
-                response = await client.get(
-                    f"/api/latest/fleet/packs/{pack_id}/scheduled",
-                    params=params,
-                )
-                return {
-                    "success": True,
-                    "message": f"Retrieved scheduled queries for pack {pack_id}",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to list scheduled queries for pack {pack_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to list scheduled queries: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            params = build_pagination_params(
+                page=page,
+                per_page=per_page,
+            )
+            response = await client.get(
+                f"/api/latest/fleet/packs/{pack_id}/scheduled",
+                params=params,
+            )
+            return format_success_response(
+                f"Retrieved scheduled queries for pack {pack_id}",
+                data=response,
+            )
 
 
 def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
@@ -150,6 +130,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
     """
 
     @mcp.tool()
+    @handle_fleet_api_errors("create pack", {"data": None})
     async def fleet_create_pack(
         name: str,
         description: str = "",
@@ -165,32 +146,22 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the created pack information.
         """
-        try:
-            async with client:
-                payload: dict[str, Any] = {
-                    "name": name,
-                    "description": description,
-                }
-                if team_id is not None:
-                    payload["team_ids"] = [team_id]
-
-                response = await client.post(
-                    "/api/latest/fleet/packs", json_data=payload
-                )
-                return {
-                    "success": True,
-                    "message": f"Created pack '{name}'",
-                    "data": response,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to create pack '{name}': {e}")
-            return {
-                "success": False,
-                "message": f"Failed to create pack: {str(e)}",
-                "data": None,
+        async with client:
+            payload: dict[str, Any] = {
+                "name": name,
+                "description": description,
             }
+            if team_id is not None:
+                payload["team_ids"] = [team_id]
+
+            response = await client.post("/api/latest/fleet/packs", json_data=payload)
+            return format_success_response(
+                f"Created pack '{name}'",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("update pack", {"data": None})
     async def fleet_update_pack(
         pack_id: int,
         name: str | None = None,
@@ -206,39 +177,31 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the updated pack information.
         """
-        try:
-            async with client:
-                payload = {}
-                if name is not None:
-                    payload["name"] = name
-                if description is not None:
-                    payload["description"] = description
+        async with client:
+            payload = {}
+            if name is not None:
+                payload["name"] = name
+            if description is not None:
+                payload["description"] = description
 
-                if not payload:
-                    return {
-                        "success": False,
-                        "message": "No update parameters provided",
-                        "data": None,
-                    }
-
-                response = await client.patch(
-                    f"/api/latest/fleet/packs/{pack_id}",
-                    json_data=payload,
-                )
+            if not payload:
                 return {
-                    "success": True,
-                    "message": f"Updated pack {pack_id}",
-                    "data": response,
+                    "success": False,
+                    "message": "No update parameters provided",
+                    "data": None,
                 }
-        except FleetAPIError as e:
-            logger.error(f"Failed to update pack {pack_id}: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to update pack: {str(e)}",
-                "data": None,
-            }
+
+            response = await client.patch(
+                f"/api/latest/fleet/packs/{pack_id}",
+                json_data=payload,
+            )
+            return format_success_response(
+                f"Updated pack {pack_id}",
+                data=response,
+            )
 
     @mcp.tool()
+    @handle_fleet_api_errors("delete pack", {"data": None})
     async def fleet_delete_pack(pack_name: str) -> dict[str, Any]:
         """Delete a pack from Fleet by name.
 
@@ -248,18 +211,9 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
         Returns:
             Dict containing the deletion result.
         """
-        try:
-            async with client:
-                await client.delete(f"/api/latest/fleet/packs/{pack_name}")
-                return {
-                    "success": True,
-                    "message": f"Deleted pack '{pack_name}'",
-                    "data": None,
-                }
-        except FleetAPIError as e:
-            logger.error(f"Failed to delete pack '{pack_name}': {e}")
-            return {
-                "success": False,
-                "message": f"Failed to delete pack: {str(e)}",
-                "data": None,
-            }
+        async with client:
+            await client.delete(f"/api/latest/fleet/packs/{pack_name}")
+            return format_success_response(
+                f"Deleted pack '{pack_name}'",
+                data=None,
+            )
