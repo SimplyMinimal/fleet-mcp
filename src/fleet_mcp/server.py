@@ -12,6 +12,7 @@ from .tools import (
     async_query_tools,
     carve_tools,
     config_tools,
+    custom_variable_tools,
     device_tools,
     host_tools,
     invite_tools,
@@ -146,6 +147,7 @@ class FleetMCPServer:
         device_tools.register_tools(
             self.mcp, self.client
         )  # Device tools are all read-only
+        custom_variable_tools.register_read_tools(self.mcp, self.client)
 
         # Always register host read tools (list_hosts, get_host, search_hosts, etc.)
         # These are regular read-only tools, not query execution tools
@@ -191,6 +193,7 @@ class FleetMCPServer:
             mdm_tools.register_write_tools(self.mcp, self.client)
             vpp_tools.register_write_tools(self.mcp, self.client)
             user_tools.register_write_tools(self.mcp, self.client)
+            custom_variable_tools.register_write_tools(self.mcp, self.client)
 
         # Register server health check tool (always available)
         self._register_health_check()
