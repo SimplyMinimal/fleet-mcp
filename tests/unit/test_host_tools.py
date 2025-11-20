@@ -136,6 +136,36 @@ class TestFleetGetHostDeviceMapping:
             host_tools.register_read_tools(mock_mcp, fleet_client)
             assert mock_mcp.tool.called
 
+    @pytest.mark.asyncio
+    async def test_none_device_mapping(self, fleet_client, mcp_server):
+        """Test handling of None device mapping (bug fix for issue with host_id 63)."""
+        mock_response = FleetResponse(
+            success=True,
+            data={"host_id": 1, "device_mapping": None},
+            message="Success",
+        )
+
+        with patch.object(fleet_client, "get", return_value=mock_response):
+            # Register the tools
+            host_tools.register_read_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            device_mapping_tool = next(
+                t for t in tools if t.name == "fleet_get_host_device_mapping"
+            )
+
+            # Actually call the tool - this should not raise TypeError
+            result = await mcp_server.call_tool(
+                device_mapping_tool.name, arguments={"host_id": 1}
+            )
+
+            # Verify the result is valid
+            assert result is not None
+            result_str = str(result)
+            # Should handle None gracefully and return count of 0
+            assert "count" in result_str.lower() or "0" in result_str
+
 
 class TestFleetGetHostEncryptionKey:
     """Test fleet_get_host_encryption_key tool."""

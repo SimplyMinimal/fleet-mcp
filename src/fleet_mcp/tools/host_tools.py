@@ -516,11 +516,12 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 response = await client.get(f"/hosts/{host_id}/device_mapping")
 
                 if response.success and response.data:
+                    device_mapping = response.data.get("device_mapping") or []
                     return {
                         "success": True,
                         "host_id": host_id,
-                        "device_mapping": response.data.get("device_mapping", []),
-                        "count": len(response.data.get("device_mapping", [])),
+                        "device_mapping": device_mapping,
+                        "count": len(device_mapping),
                         "message": f"Retrieved device mapping for host {host_id}",
                     }
                 else:
