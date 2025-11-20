@@ -16,6 +16,118 @@ from .common import (
 
 logger = logging.getLogger(__name__)
 
+# Common English stop words to filter out from keyword searches
+# These words are too common and create too many false matches
+STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "has",
+    "he",
+    "in",
+    "is",
+    "it",
+    "its",
+    "of",
+    "on",
+    "that",
+    "the",
+    "to",
+    "was",
+    "will",
+    "with",
+}
+
+
+def _calculate_keyword_relevance(
+    policy_name: str, keywords: list[str]
+) -> tuple[int, int]:
+    """Calculate relevance score for a policy based on keyword matching.
+
+    Args:
+        policy_name: The name of the policy to score
+        keywords: List of keywords to match against
+
+    Returns:
+        Tuple of (matched_keywords_count, earliest_match_position)
+        Higher matched_keywords_count is better, lower earliest_match_position is better
+    """
+    policy_name_lower = policy_name.lower()
+    matched_count = 0
+    earliest_position = len(policy_name)
+
+    for keyword in keywords:
+        keyword_lower = keyword.lower()
+        if keyword_lower in policy_name_lower:
+            matched_count += 1
+            position = policy_name_lower.index(keyword_lower)
+            earliest_position = min(earliest_position, position)
+
+    return (matched_count, -earliest_position)  # Negative position for sorting
+
+
+def _filter_and_rank_policies(
+    policies: list[dict[str, Any]], query: str
+) -> list[dict[str, Any]]:
+    """Filter and rank policies based on keyword matching.
+
+    Splits the query into keywords and ranks policies by:
+    1. Number of matching keywords (more is better)
+    2. Position of first match (earlier is better)
+
+    Stop words (common words like 'in', 'to', 'the') are filtered out to reduce
+    false matches.
+
+    Args:
+        policies: List of policy dictionaries
+        query: Search query string with keywords
+
+    Returns:
+        Filtered and sorted list of policies
+    """
+    if not query or not query.strip():
+        return policies
+
+    # Split query into keywords and filter out stop words
+    keywords = [
+        k.strip()
+        for k in query.split()
+        if k.strip() and k.strip().lower() not in STOP_WORDS
+    ]
+
+    if not keywords:
+        return policies
+
+    # Score each policy
+    scored_policies: list[dict[str, Any]] = []
+    for policy in policies:
+        policy_name = policy.get("name", "")
+        matched_count, position_score = _calculate_keyword_relevance(
+            policy_name, keywords
+        )
+
+        # Only include policies that match at least one keyword
+        if matched_count > 0:
+            scored_policies.append(
+                {
+                    "policy": policy,
+                    "score": (matched_count, position_score),
+                }
+            )
+
+    # Sort by score (descending matched_count, then descending position_score)
+    scored_policies.sort(key=lambda x: x["score"], reverse=True)
+
+    # Return just the policies
+    return [item["policy"] for item in scored_policies]
+
 
 def register_tools(mcp: FastMCP, client: FleetClient) -> None:
     """Register all policy management tools with the MCP server.
@@ -44,35 +156,141 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         order_key: str = "name",
         order_direction: str = "asc",
         team_id: int | None = None,
+        query: str = "",
     ) -> dict[str, Any]:
-        """List all policies in Fleet with pagination and sorting.
+        """List policies with optional filtering by team and name.
+
+        Search modes (automatic based on query):
+        - Single word: Fast substring search (e.g., "firewall" finds "Firewall Enabled")
+        - Multiple words: Keyword search with ranking (e.g., "Logged System" matches policies
+          containing "Logged" OR "System", ranked by relevance)
+
+        Tips for efficient use:
+        - Use single-word queries for fastest results
+        - Use team_id to narrow scope and see both team-specific and inherited policies
+        - Multi-word queries automatically filter stop words ("in", "to", "the", etc.)
 
         Args:
             page: Page number for pagination (0-based)
-            per_page: Number of policies per page
+            per_page: Number of policies per page (max 500)
             order_key: Field to order by (name, critical, created_at, updated_at)
             order_direction: Sort direction (asc, desc)
-            team_id: Filter policies by team ID
+            team_id: Filter by team ID (returns team-specific + inherited policies)
+            query: Search by policy name (empty = all policies)
 
         Returns:
             Dict containing list of policies and pagination metadata.
         """
         async with client:
-            params = build_pagination_params(
-                page=page,
-                per_page=min(per_page, 500),
-                order_key=order_key,
-                order_direction=order_direction,
-                team_id=team_id,
+            # Determine if we should use client-side filtering
+            keywords = [k.strip() for k in query.split() if k.strip()] if query else []
+            use_keyword_search = len(keywords) > 1
+
+            # Use client-side filtering when:
+            # 1. Multi-word query (keyword search with ranking)
+            # 2. Single-word query + team_id (to ensure we search all team policies)
+            use_client_side_filtering = use_keyword_search or (
+                query and team_id is not None
             )
 
-            response = await client.get("/policies", params=params)
+            if use_client_side_filtering:
+                # For client-side filtering, fetch all policies and filter/rank locally
+                # This ensures we don't miss results due to API pagination limits
+                params = build_pagination_params(
+                    page=0,  # Fetch from beginning
+                    per_page=500,  # Fetch maximum allowed
+                    order_key=order_key,
+                    order_direction=order_direction,
+                    team_id=None,  # Don't pass team_id in params when using team endpoint
+                    query=None,  # Don't filter on API side for client-side filtering
+                )
 
-            if response.success and response.data:
-                policies = response.data.get("policies", [])
-                return format_list_response(policies, "policies", page, per_page)
+                # Use correct endpoint based on whether team_id is specified
+                if team_id is not None:
+                    # Use team-specific endpoint which returns both team and inherited policies
+                    endpoint = f"/teams/{team_id}/policies"
+                else:
+                    # Use global endpoint
+                    endpoint = "/policies"
+
+                response = await client.get(endpoint, params=params)
+
+                if response.success:
+                    # Fleet API returns success=True even when no data/empty results
+                    if team_id is not None and response.data:
+                        # Team endpoint returns both 'policies' and 'inherited_policies'
+                        team_policies = response.data.get("policies", [])
+                        inherited_policies = response.data.get("inherited_policies", [])
+                        all_policies = team_policies + inherited_policies
+                    else:
+                        all_policies = (
+                            response.data.get("policies", []) if response.data else []
+                        )
+
+                    # Apply filtering and ranking
+                    if use_keyword_search:
+                        # Multi-word: use keyword-based ranking
+                        filtered_policies = _filter_and_rank_policies(
+                            all_policies, query
+                        )
+                    else:
+                        # Single-word with team_id: simple case-insensitive substring match
+                        query_lower = query.lower()
+                        filtered_policies = [
+                            p
+                            for p in all_policies
+                            if query_lower in p.get("name", "").lower()
+                        ]
+
+                    # Apply pagination to filtered results
+                    start_idx = page * per_page
+                    end_idx = start_idx + per_page
+                    paginated_policies = filtered_policies[start_idx:end_idx]
+
+                    return format_list_response(
+                        paginated_policies,
+                        "policies",
+                        page,
+                        per_page,
+                        total_count=len(filtered_policies),
+                    )
+                else:
+                    return format_error_response(response.message, policies=[], count=0)
             else:
-                return format_error_response(response.message, policies=[], count=0)
+                # For queries without client-side filtering, use Fleet API directly
+                params = build_pagination_params(
+                    page=page,
+                    per_page=min(per_page, 500),
+                    order_key=order_key,
+                    order_direction=order_direction,
+                    team_id=None,  # Don't pass team_id in params when using team endpoint
+                    query=query if query else None,
+                )
+
+                # Use correct endpoint based on whether team_id is specified
+                if team_id is not None:
+                    # Use team-specific endpoint which returns both team and inherited policies
+                    endpoint = f"/teams/{team_id}/policies"
+                else:
+                    # Use global endpoint
+                    endpoint = "/policies"
+
+                response = await client.get(endpoint, params=params)
+
+                if response.success:
+                    # Fleet API returns success=True even when no data/empty results
+                    if team_id is not None and response.data:
+                        # Team endpoint returns both 'policies' and 'inherited_policies'
+                        team_policies = response.data.get("policies", [])
+                        inherited_policies = response.data.get("inherited_policies", [])
+                        policies = team_policies + inherited_policies
+                    else:
+                        policies = (
+                            response.data.get("policies", []) if response.data else []
+                        )
+                    return format_list_response(policies, "policies", page, per_page)
+                else:
+                    return format_error_response(response.message, policies=[], count=0)
 
     @mcp.tool()
     @handle_fleet_api_errors("get policy results", {"policy": None, "policy_id": None})
