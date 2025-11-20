@@ -5,6 +5,46 @@ All notable changes to Fleet MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-11-20
+
+### Added
+- **Asynchronous Query Execution**: New async query pattern to work around the 60-second MCP client timeout limitation in TypeScript-based clients like LM Studio
+  - `fleet_run_live_query_with_results` now supports async mode when `FLEET_USE_ASYNC_QUERY_MODE=true`
+  - `fleet_get_query_results` tool to retrieve results from async queries by campaign ID
+  - `fleet_list_async_queries` tool to list all running and completed async queries with status filtering
+  - `fleet_cancel_query` tool to cancel running async queries
+  - Disk-based storage for intermediate query results with configurable retention (default: 24 hours)
+  - Future Redis support planned for distributed deployments
+
+- **Schema Overrides Feature**: Enhanced osquery table documentation with Fleet's curated metadata
+  - Automatic download of YAML schema files from Fleet's GitHub repository (`schema/tables/`)
+  - Local caching of schema overrides in `~/.fleet-mcp/cache/schema_overrides.json`
+  - Intelligent merging of override data with base osquery schemas
+  - Prominent display of usage requirements and examples in `fleet_get_osquery_table_schema` responses
+  - Multi-tier loading strategy: cache → download → stale cache fallback
+  - 24-hour cache TTL with graceful degradation if downloads fail
+
+### Changed
+- **Query Tool Enhancement**: `fleet_run_live_query_with_results` now returns campaign_id and status immediately in async mode instead of blocking
+- **Configuration Options**: Added three new configuration parameters:
+  - `use_async_query_mode` (default: false) - Enable async query execution
+  - `async_query_storage_dir` (default: `.fleet_mcp_async_queries`) - Directory for storing async query results
+  - `async_query_retention_hours` (default: 24) - Hours to retain completed query results
+- **Table Schema Cache**: Enhanced `TableSchemaCache` to support schema overrides with automatic download and caching
+- **Health Check**: Now reports schema override cache status and source (cache/download/none)
+
+### Technical Improvements
+- **AsyncQueryManager**: New disk-based query job manager with status tracking (pending/running/completed/failed/cancelled)
+- **Background Task Management**: Async queries run in background tasks with proper lifecycle management
+- **Error Handling**: Improved error messages for async query operations with detailed status information
+- **Testing**: All 19 tests pass with full backward compatibility maintained
+- **Type Safety**: No type errors, full mypy compliance maintained
+
+### Documentation
+- Updated usage documentation with async query pattern examples
+- Added schema overrides feature documentation
+- Enhanced configuration guide with new async query settings
+
 ## [1.0.2] - 2025-10-22
 
 ### Added
@@ -115,6 +155,7 @@ First production-ready release of Fleet MCP.
 
 ## Version History Summary
 
+- **1.1.0** (2025-11-20): Async query execution, schema overrides, enhanced table documentation
 - **1.0.2** (2025-10-22): Script content retrieval, version reporting, documentation improvements
 - **1.0.1** (2025-10-21): Code formatting, linting fixes, production release
 - **1.0.0** (2025-10-21): Prep for first production release with 100+ tools
