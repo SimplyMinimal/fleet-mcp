@@ -2,6 +2,37 @@
 
 A Model Context Protocol (MCP) server that enables AI assistants to interact with [Fleet Device Management](https://fleetdm.com) for device management, security monitoring, and compliance enforcement.
 
+## Demo
+<details open>
+<summary><b>📸 View Demo Screenshots</b></summary>
+
+<br/>
+
+<p align="center">
+  <img src="images/1.png" alt="Fleet MCP Demo - Querying host information and running live queries" width="800" />
+  <br/>
+  <!-- <em>Querying host information and running live queries</em> -->
+</p>
+
+<p align="center">
+  <img src="images/2.png" alt="Fleet MCP Demo - Managing policies and compliance" width="800" />
+  <br/>
+  <!-- <em>Managing policies and compliance</em> -->
+</p>
+
+<p align="center">
+  <img src="images/3.png" alt="Fleet MCP Demo - Software inventory and vulnerability tracking" width="800" />
+  <br/>
+  <!-- <em>Software inventory and vulnerability tracking</em> -->
+</p>
+
+<p align="center">
+  <img src="images/4.png" alt="Fleet MCP Demo - Advanced fleet management operations" width="800" />
+  <br/>
+  <!-- <em>Advanced fleet management operations</em> -->
+</p>
+</details>
+
 ## Features
 
 - **Host Management**: List, search, query, and manage hosts across your fleet
