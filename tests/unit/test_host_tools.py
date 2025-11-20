@@ -167,6 +167,112 @@ class TestFleetGetHostDeviceMapping:
             assert "count" in result_str.lower() or "0" in result_str
 
 
+class TestFleetListHostUpcomingActivities:
+    """Test fleet_list_host_upcoming_activities tool."""
+
+    @pytest.mark.asyncio
+    async def test_none_activities(self, fleet_client, mcp_server):
+        """Test handling of None activities (null from Fleet API)."""
+        mock_response = FleetResponse(
+            success=True,
+            data={"activities": None, "meta": {"has_next_results": False}},
+            message="Success",
+        )
+
+        with patch.object(fleet_client, "get", return_value=mock_response):
+            # Register the tools
+            host_tools.register_read_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            activities_tool = next(
+                t for t in tools if t.name == "fleet_list_host_upcoming_activities"
+            )
+
+            # Actually call the tool - this should not raise TypeError
+            result = await mcp_server.call_tool(
+                activities_tool.name, arguments={"host_id": 1}
+            )
+
+            # Verify the result is valid
+            assert result is not None
+            result_str = str(result)
+            # Should handle None gracefully and return count of 0
+            assert "count" in result_str.lower() or "0" in result_str
+
+
+class TestFleetListHostPastActivities:
+    """Test fleet_list_host_past_activities tool."""
+
+    @pytest.mark.asyncio
+    async def test_none_activities(self, fleet_client, mcp_server):
+        """Test handling of None activities (null from Fleet API)."""
+        mock_response = FleetResponse(
+            success=True,
+            data={"activities": None, "meta": {"has_next_results": False}},
+            message="Success",
+        )
+
+        with patch.object(fleet_client, "get", return_value=mock_response):
+            # Register the tools
+            host_tools.register_read_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            activities_tool = next(
+                t for t in tools if t.name == "fleet_list_host_past_activities"
+            )
+
+            # Actually call the tool - this should not raise TypeError
+            result = await mcp_server.call_tool(
+                activities_tool.name, arguments={"host_id": 1}
+            )
+
+            # Verify the result is valid
+            assert result is not None
+            result_str = str(result)
+            # Should handle None gracefully and return count of 0
+            assert "count" in result_str.lower() or "0" in result_str
+
+
+class TestFleetListHostCertificates:
+    """Test fleet_list_host_certificates tool."""
+
+    @pytest.mark.asyncio
+    async def test_none_certificates(self, fleet_client, mcp_server):
+        """Test handling of None certificates (null from Fleet API)."""
+        mock_response = FleetResponse(
+            success=True,
+            data={
+                "certificates": None,
+                "count": 0,
+                "meta": {"has_next_results": False},
+            },
+            message="Success",
+        )
+
+        with patch.object(fleet_client, "get", return_value=mock_response):
+            # Register the tools
+            host_tools.register_read_tools(mcp_server, fleet_client)
+
+            # Get the registered tool
+            tools = await mcp_server.list_tools()
+            certificates_tool = next(
+                t for t in tools if t.name == "fleet_list_host_certificates"
+            )
+
+            # Actually call the tool - this should not raise TypeError
+            result = await mcp_server.call_tool(
+                certificates_tool.name, arguments={"host_id": 1}
+            )
+
+            # Verify the result is valid
+            assert result is not None
+            result_str = str(result)
+            # Should handle None gracefully and return count of 0
+            assert "count" in result_str.lower() or "0" in result_str
+
+
 class TestFleetGetHostEncryptionKey:
     """Test fleet_get_host_encryption_key tool."""
 

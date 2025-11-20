@@ -271,7 +271,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 )
 
                 if response.success and response.data:
-                    activities = response.data.get("activities", [])
+                    activities = response.data.get("activities") or []
                     return {
                         "success": True,
                         "activities": activities,
@@ -328,7 +328,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 )
 
                 if response.success and response.data:
-                    activities = response.data.get("activities", [])
+                    activities = response.data.get("activities") or []
                     return {
                         "success": True,
                         "activities": activities,
@@ -422,7 +422,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
                 )
 
                 if response.success and response.data:
-                    certificates = response.data.get("certificates", [])
+                    certificates = response.data.get("certificates") or []
                     return {
                         "success": True,
                         "certificates": certificates,
