@@ -138,7 +138,7 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
             query: SQL query that defines the policy check
             description: Optional description of the policy
             resolution: Optional resolution steps for policy failures
-            team_id: Team ID to associate the policy with
+            team_id: Team ID to associate the policy with (if None, creates a global policy)
             critical: Whether this is a critical policy
 
         Returns:
@@ -151,10 +151,14 @@ def register_write_tools(mcp: FastMCP, client: FleetClient) -> None:
                 json_data["description"] = description
             if resolution:
                 json_data["resolution"] = resolution
-            if team_id is not None:
-                json_data["team_id"] = team_id
 
-            response = await client.post("/policies", json_data=json_data)
+            # Use team-specific endpoint if team_id is provided
+            if team_id is not None:
+                endpoint = f"/api/latest/fleet/teams/{team_id}/policies"
+            else:
+                endpoint = "/policies"
+
+            response = await client.post(endpoint, json_data=json_data)
 
             if response.success and response.data:
                 policy = response.data.get("policy", {})
