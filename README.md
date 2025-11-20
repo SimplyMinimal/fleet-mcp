@@ -3,7 +3,7 @@
 A Model Context Protocol (MCP) server that enables AI assistants to interact with [Fleet Device Management](https://fleetdm.com) for device management, security monitoring, and compliance enforcement.
 
 ## Demo
-<details open>
+<details close>
 <summary><b>📸 Show/Hide Demo Screenshots</b></summary>
 
 <br/>
