@@ -24,6 +24,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Multi-tier loading strategy: cache → download → stale cache fallback
   - 24-hour cache TTL with graceful degradation if downloads fail
 
+- **Fuzzy Matching Host Lookup**: Intelligent host identifier resolution for flexible host targeting
+  - New `host_identifier.py` utility module for smart host lookups
+  - Support for matching hosts by hostname, UUID, serial number, or hardware model
+  - Enhanced `fleet_run_live_query_with_results` to support fuzzy host matching
+  - Automatic disambiguation when multiple hosts match
+
+- **CVE Filtering Support**: Enhanced vulnerability tracking and reporting
+  - New CVE filtering capabilities in `software_tools.py`
+  - Filter software by specific CVE identifiers
+  - Improved vulnerability tracking across the fleet
+  - Enhanced documentation with CVE filtering examples
+
+- **WebSocket-Based Live Query**: Complete rewrite of live query execution
+  - Replaced `fleet_run_live_query` with WebSocket-based `fleet_run_live_query_with_results`
+  - New `websocket_client.py` module for real-time result streaming
+  - Improved reliability and performance for live queries
+
+- **Docker Support**: Containerized deployment option
+  - Added Dockerfile for easy deployment and distribution
+  - Simplified setup for containerized environments
+
+- **Development Tooling**:
+  - Pre-commit hooks for automated code quality checks (Black, isort, mypy)
+  - `.pre-commit-hooks-guide.md` documentation
+  - Updated `CONTRIBUTING.md` with pre-commit setup instructions
+  - Auto-updating pre-commit hook versions
+
+- **Security Policy**: Added `SECURITY.md` file with security reporting directions.
+
 ### Changed
 - **Query Tool Enhancement**: `fleet_run_live_query_with_results` now returns campaign_id and status immediately in async mode instead of blocking
 - **Configuration Options**: Added three new configuration parameters:
@@ -33,17 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Table Schema Cache**: Enhanced `TableSchemaCache` to support schema overrides with automatic download and caching
 - **Health Check**: Now reports schema override cache status and source (cache/download/none)
 
+### Fixed
+- **Policy Creation**: Fixed issue with creating policies globally vs team-specific
+- **WebSocket Connection**: Improved WebSocket connection handling for live queries
+- **Import Organization**: Updated `known_first_party` in pyproject.toml for better import sorting
+
 ### Technical Improvements
 - **AsyncQueryManager**: New disk-based query job manager with status tracking (pending/running/completed/failed/cancelled)
 - **Background Task Management**: Async queries run in background tasks with proper lifecycle management
+- **Code Refactoring**: Applied some DRY (Don't Repeat Yourself) principles across the codebase
+  - Refactored all tools to use common response formatting functions
+  - Created common utilities for pagination parameter building
+  - Applied `@handle_fleet_api_errors` decorator across all tool functions
+  - Consolidated error handling and response formatting
+  - Refactored activity, device, user, config, team, VPP, and async query tools
 - **Error Handling**: Improved error messages for async query operations with detailed status information
-- **Testing**: All 19 tests pass with full backward compatibility maintained
-- **Type Safety**: No type errors, full mypy compliance maintained
+- **Testing**: Comprehensive test coverage with ~1,200+ new test lines
+  - Added `test_config.py` with 33 new tests
+  - Enhanced `test_websocket_client.py` with 37 additional tests
+  - New integration tests for query host by identifier
+- **Code Quality**: Temporarily disabled ruff formatter in favor of Black for more consistent formatting
+- **Package Updates**: Updated uv packages and added WebSocket dependencies
 
 ### Documentation
 - Updated usage documentation with async query pattern examples
 - Added schema overrides feature documentation
 - Enhanced configuration guide with new async query settings
+- Added CVE filtering examples
+- Added fuzzy host matching documentation
+- Enhanced troubleshooting section
 
 ## [1.0.2] - 2025-10-22
 
@@ -155,7 +202,7 @@ First production-ready release of Fleet MCP.
 
 ## Version History Summary
 
-- **1.1.0** (2025-11-20): Async query execution, schema overrides, enhanced table documentation
+- **1.1.0** (2025-11-20): Async query execution, schema overrides, fuzzy host matching, CVE filtering, WebSocket-based queries, Docker support, major code refactoring
 - **1.0.2** (2025-10-22): Script content retrieval, version reporting, documentation improvements
 - **1.0.1** (2025-10-21): Code formatting, linting fixes, production release
 - **1.0.0** (2025-10-21): Prep for first production release with 100+ tools
