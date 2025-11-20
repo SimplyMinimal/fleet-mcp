@@ -176,3 +176,6 @@ docker/
 .python-version
 project_docs/
 reference/
+
+# Mac
+.DS_Store
