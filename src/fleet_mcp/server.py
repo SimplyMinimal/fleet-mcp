@@ -447,11 +447,12 @@ class FleetMCPServer:
         import asyncio
 
         logger.info(f"Starting Fleet MCP Server for {self.config.server_url}")
+        logger.info(f"Transport: {self.config.transport}")
 
         # Preload schema cache before starting server
         asyncio.run(self._preload_schema_cache())
 
-        self.mcp.run()
+        self.mcp.run(transport=self.config.transport)
 
 
 def create_server(config: FleetConfig | None = None) -> FleetMCPServer:

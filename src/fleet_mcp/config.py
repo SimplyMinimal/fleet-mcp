@@ -61,6 +61,11 @@ class FleetConfig(BaseSettings):
         description="Number of hours to retain completed async query results before cleanup",
     )
 
+    transport: str = Field(
+        default="stdio",
+        description="MCP transport protocol: 'stdio', 'sse', or 'streamable-http'",
+    )
+
     @field_validator("server_url")
     @classmethod
     def validate_server_url(cls, v: str) -> str:
