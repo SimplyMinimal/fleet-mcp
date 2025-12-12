@@ -1,6 +1,9 @@
 """Fleet MCP Server - Main MCP server implementation."""
 
+
 import logging
+import os
+import argparse
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -442,17 +445,24 @@ class FleetMCPServer:
             logger.warning(f"Failed to preload schema cache: {e}")
             logger.info("Schema cache will be loaded on first use")
 
-    def run(self) -> None:
-        """Run the MCP server."""
+    def run(self, port: int = 8000) -> None:
+        """Run the MCP server, supporting custom port."""
         import asyncio
+        import uvicorn
 
         logger.info(f"Starting Fleet MCP Server for {self.config.server_url}")
         logger.info(f"Transport: {self.config.transport}")
+        logger.info(f"Listening on port: {port}")
 
         # Preload schema cache before starting server
         asyncio.run(self._preload_schema_cache())
 
-        self.mcp.run(transport=self.config.transport)
+        # Only pass port for HTTP-based transports
+        if self.config.transport in ("sse", "streamable-http"):
+            app = self.mcp.sse_app() if self.config.transport == "sse" else self.mcp.streamable_http_app()
+            uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+        else:
+            self.mcp.run(transport=self.config.transport)
 
 
 def create_server(config: FleetConfig | None = None) -> FleetMCPServer:
@@ -468,16 +478,20 @@ def create_server(config: FleetConfig | None = None) -> FleetMCPServer:
 
 
 def main() -> None:
-    """Main entry point for Fleet MCP Server."""
+    """Main entry point for Fleet MCP Server with port support."""
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
+    parser = argparse.ArgumentParser(description="Fleet MCP Server")
+    parser.add_argument("--port", "-p", type=int, default=int(os.environ.get("FLEET_MCP_PORT", 8000)), help="Port to listen on for HTTP transports (default: 8000, env: FLEET_MCP_PORT)")
+    args, unknown = parser.parse_known_args()
+
     try:
         server = create_server()
-        server.run()
+        server.run(port=args.port)
     except Exception as e:
         logger.error(f"Failed to start Fleet MCP Server: {e}")
         raise
