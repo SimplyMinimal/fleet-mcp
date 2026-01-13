@@ -5,7 +5,7 @@ enabling agentic AIs to manage devices, run queries, enforce policies,
 and monitor security across fleets of computers.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.2"
 __author__ = "SimplyMinimal"
 
 from .client import FleetClient
