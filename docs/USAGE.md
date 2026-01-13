@@ -530,10 +530,72 @@ Run a saved query against specified hosts.
 ### Policy Management Tools
 
 #### `fleet_list_policies`
-List all policies in Fleet.
+List policies with optional filtering by team and name.
 
 **Parameters:**
-- `team_id` (int, optional): Filter policies by team ID
+- `page` (int, default: 0): Page number for pagination (0-based)
+- `per_page` (int, default: 100): Number of policies per page (max 500)
+- `order_key` (str, default: "name"): Field to order by (name, critical, created_at, updated_at)
+- `order_direction` (str, default: "asc"): Sort direction (asc, desc)
+- `team_id` (int, optional): Filter by team ID (returns team-specific + inherited policies)
+- `query` (str, optional): Search by policy name (empty = all policies)
+- `search_all_teams` (bool, default: False): Search across all teams (mutually exclusive with `team_id`)
+
+**How Search Works:**
+
+The tool automatically chooses the best search method based on your query:
+
+- **Single word** (e.g., `"firewall"`): Fast substring search
+  - Most efficient for simple searches
+  - Matches "Firewall Enabled", "Check Firewall Status", etc.
+
+- **Multiple words** (e.g., `"Logged System"`): Keyword search with ranking
+  - Matches policies containing ANY of the keywords
+  - Automatically filters stop words ("in", "to", "the", etc.)
+  - Ranks by relevance (more matches = higher rank)
+
+**Search Scope Options:**
+
+- **No team filter** (default): Searches only global/inherited policies
+- **Specific team** (`team_id=10`): Searches policies in that team (team-specific + inherited)
+- **All teams** (`search_all_teams=True`): Searches across ALL teams in Fleet
+  - Fetches policies from every team
+  - Deduplicates results (same policy won't appear multiple times)
+  - Useful when you don't know which team a policy belongs to
+  - **Note**: Cannot be used with `team_id` parameter
+
+**Examples:**
+
+```python
+# List all global policies
+fleet_list_policies()
+
+# Fast single-word search across global policies
+fleet_list_policies(query="firewall")
+
+# Keyword search (matches "Logged" OR "System")
+fleet_list_policies(query="Logged System")
+
+# Search within a specific team (includes team + inherited policies)
+fleet_list_policies(team_id=10, query="Disk Encryption")
+
+# Search across ALL teams (when you don't know which team)
+fleet_list_policies(search_all_teams=True, query="Disk Encryption")
+
+# List all policies from all teams
+fleet_list_policies(search_all_teams=True)
+
+# Paginate through results
+fleet_list_policies(page=1, per_page=50)
+```
+
+**Tips for Efficient Use:**
+- Use single-word queries for fastest results
+- Use `team_id` when you know which team to search
+- Use `search_all_teams=True` when you don't know which team a policy belongs to
+- Multi-word queries are ranked by relevance automatically
+- All searches are case-insensitive
+- `search_all_teams` and `team_id` cannot be used together
 
 #### `fleet_get_policy`
 Get details of a specific policy.

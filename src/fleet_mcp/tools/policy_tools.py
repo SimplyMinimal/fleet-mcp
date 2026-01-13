@@ -157,6 +157,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         order_direction: str = "asc",
         team_id: int | None = None,
         query: str = "",
+        search_all_teams: bool = False,
     ) -> dict[str, Any]:
         """List policies with optional filtering by team and name.
 
@@ -168,6 +169,7 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
         Tips for efficient use:
         - Use single-word queries for fastest results
         - Use team_id to narrow scope and see both team-specific and inherited policies
+        - Use search_all_teams=True to search across all teams when you don't know which team
         - Multi-word queries automatically filter stop words ("in", "to", "the", etc.)
 
         Args:
@@ -177,11 +179,107 @@ def register_read_tools(mcp: FastMCP, client: FleetClient) -> None:
             order_direction: Sort direction (asc, desc)
             team_id: Filter by team ID (returns team-specific + inherited policies)
             query: Search by policy name (empty = all policies)
+            search_all_teams: Search across all teams (mutually exclusive with team_id)
 
         Returns:
             Dict containing list of policies and pagination metadata.
         """
         async with client:
+            # Validate mutually exclusive parameters
+            if team_id is not None and search_all_teams:
+                return format_error_response(
+                    "Parameters 'team_id' and 'search_all_teams' cannot be used together. "
+                    "Use 'team_id' to search a specific team, or 'search_all_teams=True' to search all teams.",
+                    policies=[],
+                    count=0,
+                )
+
+            # Handle search_all_teams mode
+            if search_all_teams:
+                # Fetch all teams first
+                teams_response = await client.get("/teams", params={"per_page": 500})
+
+                if not teams_response.success or not teams_response.data:
+                    return format_error_response(
+                        f"Failed to fetch teams: {teams_response.message}",
+                        policies=[],
+                        count=0,
+                    )
+
+                teams = teams_response.data.get("teams", [])
+                all_policies = []
+                seen_policy_ids = set()  # Track unique policies to avoid duplicates
+
+                # Fetch policies from each team
+                for team in teams:
+                    team_id_current = team.get("id")
+                    if team_id_current is None:
+                        continue
+
+                    team_response = await client.get(
+                        f"/teams/{team_id_current}/policies", params={"per_page": 500}
+                    )
+
+                    if team_response.success and team_response.data:
+                        # Get both team-specific and inherited policies
+                        team_policies = team_response.data.get("policies", [])
+                        inherited_policies = team_response.data.get(
+                            "inherited_policies", []
+                        )
+
+                        # Add team-specific policies (avoid duplicates)
+                        for policy in team_policies:
+                            policy_id = policy.get("id")
+                            if policy_id and policy_id not in seen_policy_ids:
+                                seen_policy_ids.add(policy_id)
+                                all_policies.append(policy)
+
+                        # Add inherited policies (avoid duplicates)
+                        for policy in inherited_policies:
+                            policy_id = policy.get("id")
+                            if policy_id and policy_id not in seen_policy_ids:
+                                seen_policy_ids.add(policy_id)
+                                all_policies.append(policy)
+
+                # Apply query filtering if provided
+                if query:
+                    keywords = [k.strip() for k in query.split() if k.strip()]
+                    if len(keywords) > 1:
+                        # Multi-word: use keyword-based ranking
+                        filtered_policies = _filter_and_rank_policies(
+                            all_policies, query
+                        )
+                    else:
+                        # Single-word: simple case-insensitive substring match
+                        query_lower = query.lower()
+                        filtered_policies = [
+                            p
+                            for p in all_policies
+                            if query_lower in p.get("name", "").lower()
+                        ]
+                else:
+                    filtered_policies = all_policies
+
+                # Sort the results
+                reverse = order_direction.lower() == "desc"
+                if order_key in ["name", "critical", "created_at", "updated_at"]:
+                    filtered_policies.sort(
+                        key=lambda p: p.get(order_key, ""), reverse=reverse
+                    )
+
+                # Apply pagination
+                start_idx = page * per_page
+                end_idx = start_idx + per_page
+                paginated_policies = filtered_policies[start_idx:end_idx]
+
+                return format_list_response(
+                    paginated_policies,
+                    "policies",
+                    page,
+                    per_page,
+                    total_count=len(filtered_policies),
+                )
+
             # Determine if we should use client-side filtering
             keywords = [k.strip() for k in query.split() if k.strip()] if query else []
             use_keyword_search = len(keywords) > 1
