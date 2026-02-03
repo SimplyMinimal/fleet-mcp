@@ -1,6 +1,8 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SimplyMinimal/fleet-mcp)
 # Fleet MCP
 
 A Model Context Protocol (MCP) server that enables AI assistants to interact with [Fleet Device Management](https://fleetdm.com) for device management, security monitoring, and compliance enforcement.
+
 
 ## Demo
 <details close>
