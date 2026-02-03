@@ -1,4 +1,5 @@
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SimplyMinimal/fleet-mcp) ![PyPI - Version](https://img.shields.io/pypi/v/fleet-mcp?link=https%3A%2F%2Fpypi.org%2Fproject%2Ffleet-mcp%2F&link=!%5BPyPI%20-%20Version%5D(https%3A%2F%2Fimg.shields.io%2Fpypi%2Fv%2Ffleet-mcp%3Flink%3Dhttps%253A%252F%252Fpypi.org%252Fproject%252Ffleet-mcp%252F%26link%3Dhttps%253A%252F%252Fpypi.org%252Fproject%252Ffleet-mcp%252F))
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SimplyMinimal/fleet-mcp)
+
 
 
 
