@@ -1,4 +1,5 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SimplyMinimal/fleet-mcp)
+<!-- mcp-name: io.github.SimplyMinimal/fleet-mcp -->
 
 
 
