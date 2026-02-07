@@ -84,11 +84,25 @@ def _load_config(ctx: click.Context) -> FleetConfig:
         sys.exit(1)
 
 
+
 @cli.command()
+@click.option(
+    "--port",
+    "-p",
+    type=int,
+    default=None,
+    help="Port to listen on for HTTP transports (default: 8000, env: FLEET_MCP_PORT)",
+    show_default=False,
+)
 @click.pass_context
-def run(ctx: click.Context) -> None:
+def run(ctx: click.Context, port: int | None = None) -> None:
     """Run the Fleet MCP server."""
     config = _load_config(ctx)
+
+    # Dynamically determine port: CLI > env > default
+    if port is None:
+        import os
+        port = int(os.environ.get("FLEET_MCP_PORT", 8000))
 
     try:
         server = FleetMCPServer(config)
@@ -96,7 +110,7 @@ def run(ctx: click.Context) -> None:
         click.echo(
             f"Starting Fleet MCP Server for {config.server_url}{readonly_status}"
         )
-        server.run()
+        server.run(port=port)
     except KeyboardInterrupt:
         click.echo("\nShutting down Fleet MCP Server...")
     except Exception as e:
