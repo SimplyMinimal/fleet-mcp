@@ -1,0 +1,57 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.SimplyMinimal/fleet-mcp",
+  "description": "An MCP server that provides tools for managing and monitoring your Fleet Device Management instance.",
+  "repository": {
+    "url": "https://github.com/SimplyMinimal/fleet-mcp",
+    "source": "github"
+  },
+  "version": "1.1.3",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "fleet-mcp",
+      "version": "1.1.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Your Fleet server URL (e.g., https://your-fleet-instance.com)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false,
+          "name": "FLEET_SERVER_URL"
+        },
+        {
+          "description": "Your Fleet API token. Get this from Fleet UI: My account > Get API token",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true,
+          "name": "FLEET_API_TOKEN"
+        },
+        {
+          "description": "Enable read-only mode",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "FLEET_READONLY"
+        },
+        {
+          "description": "Allow SELECT queries in read-only mode. This allows you to run live queries.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "FLEET_ALLOW_SELECT_QUERIES"
+        },
+        {
+          "description": "Verify SSL certificates when connecting to your Fleet instance.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "FLEET_VERIFY_SSL"
+        }
+      ]
+    }
+  ]
+}
