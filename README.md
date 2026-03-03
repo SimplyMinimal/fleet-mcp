@@ -11,7 +11,7 @@ A Model Context Protocol (MCP) server that enables AI assistants to interact wit
 
 
 ## Demo
-<details close>
+<details open>
 <summary><b>📸 Show/Hide Demo Screenshots</b></summary>
 
 <br/>
